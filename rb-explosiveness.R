@@ -2,6 +2,12 @@ library(rdtools)
 library(tidyverse)
 library(ggthemes)
 library(nflfastR)
+library(mltools)
+library(data.table)
+library(xgboost)
+library(caret)
+library(vip)
+library(SHAPforxgboost)
 
 theme_reach <- function() {
   theme_fivethirtyeight() +
@@ -778,6 +784,8 @@ speed_yardline_box <- rushing_data_speed %>%
   summarize(rushes = n(),
             avg_speed = mean(avg_speed))
 
+speed_yardline_box$box_players <- factor(speed_yardline_box$box_players, levels = c(5, 6, 7, 8))
+
 speed_yardline_box %>%
   filter(avg_speed < 5.8) %>%
   mutate(`Box Defenders` = as.factor(box_players)) %>%
@@ -794,12 +802,170 @@ speed_yardline_box %>%
        subtitle = "2020, speed is determined by handoff until first contact") +
   guides(size = FALSE)
 
-    
+rushing_data_speed %>%
+  filter(concept_1 %in% c("Outside Zone", "Inside Zone", "Man", "Power", "Pull Lead", "Counter", "Draw", "Trap")) %>%
+  group_by(concept_1) %>%
+  mutate(speed = mean(avg_speed)) %>%
+  ungroup() %>%
+  mutate(concept_1 = fct_reorder(concept_1, speed)) %>%
+  ggplot(aes(x = concept_1, y = avg_speed)) +
+  geom_violin(aes(color = concept_1)) +
+  geom_boxplot(aes(fill = concept_1)) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  # scale_fill_brewer(palette = "Paired") +
+  # scale_color_brewer(palette = "Paired") +
+  theme_reach() +
+  labs(x = "Run Concept",
+       y = "Speed Before Contact",
+       title = "How Run Concept Affects a Running Back's Speed Through the Hole",
+       subtitle = "2020, eight most common run types selected") 
+ggsave('speed-run-concept.png', width = 15, height = 10, dpi = "retina")
 
+rushing_data_speed <- rushing_data_speed %>%
+  mutate(seconds_left_in_half = case_when(
+    quarter == 1 ~ as.integer(seconds_left_in_quarter + 900),
+    quarter == 2 ~ as.integer(seconds_left_in_quarter),
+    quarter == 3 ~ as.integer(seconds_left_in_quarter + 900),
+    quarter == 4 ~ as.integer(seconds_left_in_quarter),
+    TRUE ~ as.integer(0)
+  )) %>%
+  dplyr::select(-seconds_left_in_quarter)
 
+colSums(is.na(rushing_data_speed))
 
+others <- c("FB Run", "Undefined", "Sneak")
 
+rushing_data_speed <- rushing_data_speed %>%
+  mutate(concept_1 = ifelse(concept_1 %in% others, "Other", concept_1))
 
+speed_data_select <- rushing_data_speed %>%
+  dplyr::select(down, distance, seconds_left_in_half, box_players, 
+                concept_1, avg_speed) %>%
+  mutate(label = avg_speed) %>%
+  dplyr::select(-avg_speed) %>%
+  mutate(concept_1 = as.factor(concept_1)) %>%
+  mutate(down = as.factor(down)) %>%
+  dplyr::select(label, everything())
+
+trsf <- one_hot(as.data.table(speed_data_select))
+
+colSums(is.na(trsf))
+
+smp_size <- floor(0.50 * nrow(trsf))
+set.seed(2011) #go lions
+ind <- sample(seq_len(nrow(trsf)), size = smp_size)
+train <- as.matrix(trsf[ind, ])
+test <- as.matrix(trsf[-ind, ])
+
+dim(train)
+
+speed_mod <-
+  xgboost(
+    data = train[, 2:19],
+    label = train[, 1],
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 6,
+    eta = .25
+  )   
+
+pred_xgb <- predict(speed_mod, test[, 2:19])
+
+yhat <- pred_xgb
+y <- test[, 1]
+postResample(yhat, y) #RMSE = 1.22
+
+hyper_grid <- expand.grid(max_depth = seq(2, 6, 1),
+                          eta = seq(.18, .28, .01))
+
+xgb_train_rmse <- NULL
+xgb_test_rmse <- NULL
+
+for (j in 1:nrow(hyper_grid)) {
+  set.seed(123)
+  m_xgb_untuned <- xgb.cv(
+    data = train[, 2:19],
+    label = train[, 1],
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    nfold = 5,
+    max_depth = hyper_grid$max_depth[j],
+    eta = hyper_grid$eta[j]
+  )
+  
+  xgb_train_rmse[j] <- m_xgb_untuned$evaluation_log$train_rmse_mean[m_xgb_untuned$best_iteration]
+  xgb_test_rmse[j] <- m_xgb_untuned$evaluation_log$test_rmse_mean[m_xgb_untuned$best_iteration]
+  
+  cat(j, "\n")
+}
+
+#ideal hyperparamters
+hyper_grid[which.min(xgb_test_rmse), ]
+
+speed_model <-
+  xgboost(
+    data = train[, 2:19],
+    label = train[, 1],
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 2, #ideal max depth
+    eta = 0.24 #ideal eta
+  )   
+
+vip(speed_model, num_features = 18) +
+  theme_reach()
+
+shap_values <- shap.values(xgb_model = speed_model, X_train = train[, 2:19])
+shape_values_mean <- as.data.frame(shap_values$mean_shap_score)
+shap_long <- shap.prep(xgb_model = speed_model, X_train = train[, 2:19])
+shap_long <- shap.prep(shap_contrib = shap_values$shap_score, X_train = train[, 2:19])
+shap.plot.summary(shap_long)
+
+pred_xgb <- predict(speed_model, test[, 2:19])
+
+yhat <- pred_xgb
+y <- test[, 1]
+postResample(yhat, y) #RMSE = 1.04
+
+speed_preds <- as.data.frame(
+  matrix(predict(speed_model, as.matrix(trsf %>% select(-label))))
+) %>%
+  dplyr::rename(exp_speed = V1)
+
+speed_projs <- cbind(rushing_data_speed, speed_preds)
+
+speed_projs <- speed_projs %>%
+  mutate(speed_oe = avg_speed - exp_speed)
+
+speed_oe_stats <- speed_projs %>%
+  group_by(player, offense) %>%
+  summarize(rushes = n(), 
+            avg_speed_oe = mean(speed_oe),
+            avg_ybc = mean(ybc)) %>%
+  filter(rushes >= 100) %>%
+  arrange(-avg_speed_oe) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+
+speed_oe_stats %>%
+  ggplot(aes(x = avg_speed_oe, y = avg_ybc)) +
+  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
+  geom_hline(yintercept = mean(speed_oe_stats$avg_ybc), linetype = "dashed", alpha = 0.5) +
+  geom_vline(xintercept = mean(speed_oe_stats$avg_speed_oe), linetype = "dashed", alpha = 0.5) +
+  geom_point(aes(fill = team_color, color = team_color2, size = rushes), shape = 21, alpha = 0.9) +
+  ggrepel::geom_text_repel(aes(label = player), size = 5, box.padding = 0.3) +
+  theme_reach() +
+  scale_color_identity(aesthetics = c("fill", "color")) +
+  labs(x = "Speed Over Expected",
+       y = "Yards Before Contact",
+       title = "How Speed Over Expected Impacts Yards Before Contact, 2020",
+       subtitle = "Minimum of 100 rushes") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+ggsave('2020-speed-oe.png', width = 15, height = 10, dpi = "retina")
 
 
 
