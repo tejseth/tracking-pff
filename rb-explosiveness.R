@@ -938,6 +938,10 @@ speed_preds <- as.data.frame(
 
 speed_projs <- cbind(rushing_data_speed, speed_preds)
 
+summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared #0.18
+summary(lm(ybc ~ exp_speed, data = speed_projs))$r.squared #0.00
+summary(lm(ybc ~ avg_speed, data = speed_projs))$r.squared #0.14
+
 speed_projs <- speed_projs %>%
   mutate(speed_oe = avg_speed - exp_speed)
 
