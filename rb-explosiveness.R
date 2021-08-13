@@ -710,7 +710,7 @@ rushing_data_speed <- rushing_data %>%
   dplyr::select(game_id, play_id, offense, defense, season, week, down, distance, player_id,
                 position, quarter, seconds_left_in_quarter, concept_1, concept_2, run_position,
                 intended_run_position, run_direction, box_players, rpo, yards,
-                yards_after_contact, avoided_tackles) %>%
+                yards_after_contact, avoided_tackles, yards_to_go) %>%
   left_join(play_speed_all, by = c("game_id" = "gameid", "play_id" = "playid")) %>%
   filter(!is.na(avg_speed))
 
@@ -741,24 +741,64 @@ rusher_speed %>%
   scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
 ggsave('2020-speed.png', width = 15, height = 10, dpi = "retina")
 
-ekeler <- tracking_ %>%
-  filter(gameid == 18542 & playid == 3526308) %>%
-  filter(player_name == "Austin Ekeler")
+rushing_data_speed$avoided_tackles[is.na(rushing_data_speed$avoided_tackles)] <- 0
 
-ekeler %>%
-  filter(time_since_snap < 6) %>%
-  ggplot(aes(x = time_since_snap, y = speed)) +
-  geom_line(color = "#0073cf", size = 2) +
-  geom_point(fill = "#002244", color = "#0073cf", shape = 21, size = 6) +
+rushing_data_speed <- rushing_data_speed %>%
+  dplyr::select(-...1)
+
+colSums(is.na(rushing_data_speed))
+
+speed_down_distance <- rushing_data_speed %>%
+  filter(distance < 15) %>%
+  filter(down %in% c(1, 2, 3)) %>%
+  group_by(down, distance) %>%
+  summarize(rushes = n(),
+            avg_speed = mean(avg_speed))
+
+speed_down_distance %>%
+  filter(avg_speed > 4 & avg_speed < 6) %>%
+  mutate(Down = as.factor(down)) %>%
+  ggplot(aes(x = distance, y = avg_speed, color = Down)) +
+  geom_point(aes(size = rushes), alpha = 0.4) +
+  geom_smooth(aes(color = Down), se = FALSE, size = 2) +
+  scale_color_canva(palette = "Fresh and bright") +
   theme_reach() +
-  geom_vline(xintercept = 2.1, linetype = "dashed", alpha = 0.8) +
-  annotate("text", x = 2.0, y = 0.9, label = "Handoff", angle = 90, size = 5) +
-  geom_vline(xintercept = 4.2, linetype = "dashed", alpha = 0.8) +
-  annotate("text", x = 4.1, y = 1.35, label = "First Contact", angle = 90, size = 5) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
-  labs(x = "Seconds Since Snap",
-       y = "Speed",
-       title = "Austin Ekeler had the Highest Average Burst in Week 1 on This Play")
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
+  theme(legend.position = "bottom") +
+  labs(x = "Yards to Sticks",
+       y = "Average Speed",
+       title = "How Down and Distance Impacts Running Back Speed",
+       subtitle = "2020, speed is determined by handoff until first contact") +
+  guides(size = FALSE)
+
+speed_yardline_box <- rushing_data_speed %>%
+  filter(box_players %in% c(5, 6, 7, 8)) %>%
+  mutate(yards_bin = round(yards_to_go / 5) * 5) %>%
+  group_by(yards_bin, box_players) %>%
+  summarize(rushes = n(),
+            avg_speed = mean(avg_speed))
+
+speed_yardline_box %>%
+  filter(avg_speed < 5.8) %>%
+  mutate(`Box Defenders` = as.factor(box_players)) %>%
+  ggplot(aes(x = yards_bin, y = avg_speed, color = `Box Defenders`)) +
+  geom_point(aes(size = rushes), alpha = 0.4) +
+  geom_smooth(aes(color = `Box Defenders`), se = FALSE, size = 2) +
+  scale_color_canva(palette = "Fresh and bright") +
+  theme_reach() +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
+  theme(legend.position = "bottom") +
+  labs(x = "Yards From Endzone",
+       y = "Average Speed",
+       title = "How Yardline and Box Defenders Impacts Running Back Speed",
+       subtitle = "2020, speed is determined by handoff until first contact") +
+  guides(size = FALSE)
+
+    
+
+
+
+
 
 
 
