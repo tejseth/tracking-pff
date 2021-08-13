@@ -3,8 +3,6 @@ library(tidyverse)
 library(ggthemes)
 library(nflfastR)
 
-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
-
 theme_reach <- function() {
   theme_fivethirtyeight() +
     theme(
@@ -22,8 +20,7 @@ theme_reach <- function() {
 trace(pull_ngs,edit=TRUE)
 rushing_data <<- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/rushing.csv.gz"), season_start = 2017, season_end = 2020)
 tracking_run_2020_1 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 1, wk_end = 1, run_pass_all = "r")
-#tracking_run_2020_2 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 2, wk_end = 2, run_pass_all = "r")
-tracking_run_2020_2 <- read_csv("~/Downloads/2020_week_2.csv")
+tracking_run_2020_2 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 2, wk_end = 2, run_pass_all = "r")
 tracking_run_2020_3 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 3, wk_end = 3, run_pass_all = "r")
 tracking_run_2020_4 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 4, wk_end = 4, run_pass_all = "r")
 tracking_run_2020_5 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 5, wk_end = 5, run_pass_all = "r")
@@ -657,13 +654,27 @@ play_speed_17 <- tracking_17_rushers %>%
             ybc = mean(yards_before_contact))
 write.csv(play_speed_17, "play_speed_17.csv")
 
+ID <- c(seq(1, 17))
 
-play_speed_all <- do.call("rbind", list(play_speed_1, play_speed_2, play_speed_3, 
-                                        play_speed_4, play_speed_5, play_speed_6, 
-                                        play_speed_7,play_speed_8, play_speed_9, 
-                                        play_speed_10, play_speed_11, play_speed_12, play_speed_13,
-                                        play_speed_14, play_speed_15, play_speed_16, play_speed_17))
+df_play_speed_all <- list()
+
+for(i in 1:length(ID)){
+  
+  play_speed_temp <- read_csv(paste0("~/tracking-pff/play-speed-week/play_speed_",ID[i],".csv"),
+                               col_types = cols())
+  
+  df_play_speed_all[[i]] <- play_speed_temp
+  
+}
+
+play_speed_all <- rbindlist(df_play_speed_all)
 write.csv(play_speed_all, "play_speed_all.csv")
+
+# play_speed_all <- do.call("rbind", list(play_speed_1, play_speed_2, play_speed_3, 
+#                                         play_speed_4, play_speed_5, play_speed_6, 
+#                                         play_speed_7,play_speed_8, play_speed_9, 
+#                                         play_speed_10, play_speed_11, play_speed_12, play_speed_13,
+#                                         play_speed_14, play_speed_15, play_speed_16, play_speed_17))
 
 play_speed_all %>%
   ggplot(aes(x = avg_speed, y = ybc)) +
