@@ -608,7 +608,7 @@ for(i in 1:length(ID)){
 }
 
 play_speed_all <- rbindlist(df_play_speed_all)
-write.csv(play_speed_all, "play_speed_all.csv")
+write.csv(play_speed_all, "play_speed_all_20.csv")
 
 ###################################### 2019 ###################################
 
