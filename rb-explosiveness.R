@@ -1,87 +1,7 @@
-library(rdtools)
-library(tidyverse)
-library(ggthemes)
-library(nflfastR)
-library(mltools)
-library(data.table)
-library(xgboost)
-library(caret)
-library(vip)
-library(SHAPforxgboost)
-library(ggimage)
+play_speed_all_19 <- read.csv("~/tracking-pff/play_speed_all_19.csv")
+play_speed_all_20 <- read.csv("~/tracking-pff/play_speed_all_20.csv")
 
-theme_reach <- function() {
-  theme_fivethirtyeight() +
-    theme(
-      legend.position = "none",
-      plot.title = element_text(size = 22, hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(size = 18, hjust = 0.5),
-      axis.title.x = element_text(size=18),
-      axis.title.y = element_text(size=18),
-      axis.text = element_text(size = 14),
-      strip.text = element_text(size = 16, face = "bold"),
-      legend.text = element_text(size = 14)
-    )
-}
-
-trace(pull_ngs,edit=TRUE)
-rushing_data <<- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/rushing.csv.gz"), season_start = 2017, season_end = 2020)
-tracking_run_2020_1 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 1, wk_end = 1, run_pass_all = "r")
-tracking_run_2020_2 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 2, wk_end = 2, run_pass_all = "r")
-tracking_run_2020_3 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 3, wk_end = 3, run_pass_all = "r")
-tracking_run_2020_4 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 4, wk_end = 4, run_pass_all = "r")
-tracking_run_2020_5 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 5, wk_end = 5, run_pass_all = "r")
-tracking_run_2020_6 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 6, wk_end = 6, run_pass_all = "r")
-tracking_run_2020_7 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 7, wk_end = 7, run_pass_all = "r")
-tracking_run_2020_8 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 8, wk_end = 8, run_pass_all = "r")
-tracking_run_2020_9 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 9, wk_end = 9, run_pass_all = "r")
-tracking_run_2020_10 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 10, wk_end = 10, run_pass_all = "r")
-tracking_run_2020_11 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 11, wk_end = 11, run_pass_all = "r")
-tracking_run_2020_12 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 12, wk_end = 12, run_pass_all = "r")
-tracking_run_2020_13 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 13, wk_end = 13, run_pass_all = "r")
-tracking_run_2020_14 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 14, wk_end = 14, run_pass_all = "r")
-tracking_run_2020_15 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 15, wk_end = 15, run_pass_all = "r")
-tracking_run_2020_16 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 16, wk_end = 16, run_pass_all = "r")
-tracking_run_2020_17 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 17, wk_end = 17, run_pass_all = "r")
-
-# tracking_run_2020 <- do.call("rbind", list(tracking_run_2020_1, tracking_run_2020_2, tracking_run_2020_3,
-#                                            tracking_run_2020_4, tracking_run_2020_5, tracking_run_2020_6,
-#                                            tracking_run_2020_7, tracking_run_2020_8, tracking_run_2020_9,
-#                                            tracking_run_2020_10, tracking_run_2020_11, tracking_run_2020_12,
-#                                            tracking_run_2020_13, tracking_run_2020_14, tracking_run_2020_15, 
-#                                            tracking_run_2020_16, tracking_run_2020_17))
-
-rushing_data <- rushing_data %>%
-  mutate(offense = case_when(
-    offense == "SD" ~ "LAC",
-    offense == "BLT" ~ "BAL",
-    offense == "OAK" ~ "LV",
-    offense == "HST" ~ "HOU",
-    offense == "SL" ~ "LA",
-    offense == "CLV" ~ "CLE", 
-    offense == "ARZ" ~ "ARI",
-    TRUE ~ offense
-  )) %>%
-  ungroup()
-
-rushing_data <- rushing_data %>%
-  mutate(defense = case_when(
-    defense == "SD" ~ "LAC",
-    defense == "BLT" ~ "BAL",
-    defense == "OAK" ~ "LV",
-    defense == "HST" ~ "HOU",
-    defense == "SL" ~ "LA",
-    defense == "CLV" ~ "CLE", 
-    defense == "ARZ" ~ "ARI",
-    TRUE ~ defense
-  )) %>%
-  ungroup()
-
-rushing_data <- rushing_data %>%
-  mutate(yards_before_contact = yards - yards_after_contact)
-
-rushers <- rushing_data %>%
-  dplyr::select(game_id, play_id, player, yards_before_contact)
+play_speed_all <- rbind(play_speed_all_20, play_speed_all_19)
 
 play_speed_all %>%
   ggplot(aes(x = avg_speed, y = ybc)) +
@@ -123,7 +43,7 @@ rushing_data_speed <- rushing_data %>%
   dplyr::filter(grepl("HB",position))
 
 rusher_speed <- rushing_data_speed %>%
-  group_by(player, offense) %>%
+  group_by(player, offense, season) %>%
   summarize(rushes = n(),
             avg_speed = mean(avg_speed, na.rm = T),
             avg_seconds_bc = mean(seconds_before_contact, na.rm = T),
@@ -394,5 +314,8 @@ team_speed %>%
        subtitle = "Rushing speed determined by a running back's speed from handoff to first contact") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+
+combine_data <- pull_api("/v1/player_combine_results")$player_combine_results
+pro_day_data <- pull_api("/v1/player_pro_day")$player_pro_day
  
 

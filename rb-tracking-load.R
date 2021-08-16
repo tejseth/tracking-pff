@@ -1,3 +1,65 @@
+library(rdtools)
+library(tidyverse)
+library(ggthemes)
+library(nflfastR)
+library(mltools)
+library(data.table)
+library(xgboost)
+library(caret)
+library(vip)
+library(SHAPforxgboost)
+library(ggimage)
+
+trace(pull_ngs,edit=TRUE)
+
+theme_reach <- function() {
+  theme_fivethirtyeight() +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(size = 22, hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(size = 18, hjust = 0.5),
+      axis.title.x = element_text(size=18),
+      axis.title.y = element_text(size=18),
+      axis.text = element_text(size = 14),
+      strip.text = element_text(size = 16, face = "bold"),
+      legend.text = element_text(size = 14)
+    )
+}
+
+rushing_data <<- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/rushing.csv.gz"), season_start = 2017, season_end = 2020)
+
+rushing_data <- rushing_data %>%
+  mutate(offense = case_when(
+    offense == "SD" ~ "LAC",
+    offense == "BLT" ~ "BAL",
+    offense == "OAK" ~ "LV",
+    offense == "HST" ~ "HOU",
+    offense == "SL" ~ "LA",
+    offense == "CLV" ~ "CLE", 
+    offense == "ARZ" ~ "ARI",
+    TRUE ~ offense
+  )) %>%
+  ungroup()
+
+rushing_data <- rushing_data %>%
+  mutate(defense = case_when(
+    defense == "SD" ~ "LAC",
+    defense == "BLT" ~ "BAL",
+    defense == "OAK" ~ "LV",
+    defense == "HST" ~ "HOU",
+    defense == "SL" ~ "LA",
+    defense == "CLV" ~ "CLE", 
+    defense == "ARZ" ~ "ARI",
+    TRUE ~ defense
+  )) %>%
+  ungroup()
+
+rushing_data <- rushing_data %>%
+  mutate(yards_before_contact = yards - yards_after_contact)
+
+rushers <- rushing_data %>%
+  dplyr::select(game_id, play_id, player, yards_before_contact)
+
 tracking_run_2020_1 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 1, wk_end = 1, run_pass_all = "r")
 tracking_run_2020_2 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 2, wk_end = 2, run_pass_all = "r")
 tracking_run_2020_3 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 3, wk_end = 3, run_pass_all = "r")
@@ -607,8 +669,8 @@ for(i in 1:length(ID)){
   
 }
 
-play_speed_all <- rbindlist(df_play_speed_all)
-write.csv(play_speed_all, "play_speed_all_20.csv")
+play_speed_all_20 <- rbindlist(df_play_speed_all)
+write.csv(play_speed_all_20, "play_speed_all_20.csv")
 
 ###################################### 2019 ###################################
 
@@ -1831,7 +1893,7 @@ for(i in 1:length(ID)){
   play_speed_temp_18 <- read_csv(paste0("~/tracking-pff/play-speed-week/play_speed_",ID[i],"_18.csv"),
                                  col_types = cols())
   
-  df_play_speed_all_18[[i]] <- play_speed_temp_19
+  df_play_speed_all_18[[i]] <- play_speed_temp_18
   
 }
 
