@@ -8,6 +8,7 @@ library(xgboost)
 library(caret)
 library(vip)
 library(SHAPforxgboost)
+library(ggimage)
 
 theme_reach <- function() {
   theme_fivethirtyeight() +
@@ -82,606 +83,6 @@ rushing_data <- rushing_data %>%
 rushers <- rushing_data %>%
   dplyr::select(game_id, play_id, player, yards_before_contact)
 
-tracking_1 <- tracking_run_2020_1 %>%
-  filter(run_pass == "R")
-first_contact_1 <- tracking_1 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_1 <- tracking_1 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_1 <- tracking_1 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_1 <- play_end_1 %>%
-  left_join(first_contact_1, by = c("gameid", "playid")) %>%
-  left_join(handoff_1, by = c("gameid", "playid"))
-tracking_1 <- tracking_1 %>%
-  left_join(frames_1, by = c("gameid", "playid"))
-tracking_1_filtered <- tracking_1 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_1_rushers <- tracking_1_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_1_rushers <- tracking_1_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_1 <- tracking_1_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_1, "play_speed_1.csv")
-
-tracking_2 <- tracking_run_2020_2 %>%
-  filter(run_pass == "R")
-first_contact_2 <- tracking_2 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_2 <- tracking_2 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_2 <- tracking_2 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_2 <- play_end_2 %>%
-  left_join(first_contact_2, by = c("gameid", "playid")) %>%
-  left_join(handoff_2, by = c("gameid", "playid"))
-tracking_2 <- tracking_2 %>%
-  left_join(frames_2, by = c("gameid", "playid"))
-tracking_2_filtered <- tracking_2 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_2_rushers <- tracking_2_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_2_rushers <- tracking_2_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_2 <- tracking_2_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_2, "play_speed_2.csv")
-
-tracking_3 <- tracking_run_2020_3 %>%
-  filter(run_pass == "R")
-first_contact_3 <- tracking_3 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_3 <- tracking_3 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_3 <- tracking_3 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_3 <- play_end_3 %>%
-  left_join(first_contact_3, by = c("gameid", "playid")) %>%
-  left_join(handoff_3, by = c("gameid", "playid"))
-tracking_3 <- tracking_3 %>%
-  left_join(frames_3, by = c("gameid", "playid"))
-tracking_3_filtered <- tracking_3 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_3_rushers <- tracking_3_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_3_rushers <- tracking_3_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_3 <- tracking_3_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_3, "play_speed_3.csv")
-
-tracking_4 <- tracking_run_2020_4 %>%
-  filter(run_pass == "R")
-first_contact_4 <- tracking_4 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_4 <- tracking_4 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_4 <- tracking_4 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_4 <- play_end_4 %>%
-  left_join(first_contact_4, by = c("gameid", "playid")) %>%
-  left_join(handoff_4, by = c("gameid", "playid"))
-tracking_4 <- tracking_4 %>%
-  left_join(frames_4, by = c("gameid", "playid"))
-tracking_4_filtered <- tracking_4 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_4_rushers <- tracking_4_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_4_rushers <- tracking_4_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_4 <- tracking_4_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_4, "play_speed_4.csv")
-
-tracking_5 <- tracking_run_2020_5 %>%
-  filter(run_pass == "R")
-first_contact_5 <- tracking_5 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_5 <- tracking_5 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_5 <- tracking_5 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_5 <- play_end_5 %>%
-  left_join(first_contact_5, by = c("gameid", "playid")) %>%
-  left_join(handoff_5, by = c("gameid", "playid"))
-tracking_5 <- tracking_5 %>%
-  left_join(frames_5, by = c("gameid", "playid"))
-tracking_5_filtered <- tracking_5 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_5_rushers <- tracking_5_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_5_rushers <- tracking_5_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_5 <- tracking_5_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_5, "play_speed_5.csv")
-
-tracking_6 <- tracking_run_2020_6 %>%
-  filter(run_pass == "R")
-first_contact_6 <- tracking_6 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_6 <- tracking_6 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_6 <- tracking_6 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_6 <- play_end_6 %>%
-  left_join(first_contact_6, by = c("gameid", "playid")) %>%
-  left_join(handoff_6, by = c("gameid", "playid"))
-tracking_6 <- tracking_6 %>%
-  left_join(frames_6, by = c("gameid", "playid"))
-tracking_6_filtered <- tracking_6 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_6_rushers <- tracking_6_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_6_rushers <- tracking_6_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_6 <- tracking_6_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_6, "play_speed_6.csv")
-
-tracking_7 <- tracking_run_2020_7 %>%
-  filter(run_pass == "R")
-first_contact_7 <- tracking_7 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_7 <- tracking_7 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_7 <- tracking_7 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_7 <- play_end_7 %>%
-  left_join(first_contact_7, by = c("gameid", "playid")) %>%
-  left_join(handoff_7, by = c("gameid", "playid"))
-tracking_7 <- tracking_7 %>%
-  left_join(frames_7, by = c("gameid", "playid"))
-tracking_7_filtered <- tracking_7 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_7_rushers <- tracking_7_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_7_rushers <- tracking_7_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_7 <- tracking_7_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_7, "play_speed_7.csv")
-
-tracking_8 <- tracking_run_2020_8 %>%
-  filter(run_pass == "R")
-first_contact_8 <- tracking_8 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_8 <- tracking_8 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_8 <- tracking_8 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_8 <- play_end_8 %>%
-  left_join(first_contact_8, by = c("gameid", "playid")) %>%
-  left_join(handoff_8, by = c("gameid", "playid"))
-tracking_8 <- tracking_8 %>%
-  left_join(frames_8, by = c("gameid", "playid"))
-tracking_8_filtered <- tracking_8 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_8_rushers <- tracking_8_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_8_rushers <- tracking_8_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_8 <- tracking_8_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_8, "play_speed_8.csv")
-
-tracking_9 <- tracking_run_2020_9 %>%
-  filter(run_pass == "R")
-first_contact_9 <- tracking_9 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_9 <- tracking_9 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_9 <- tracking_9 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_9 <- play_end_9 %>%
-  left_join(first_contact_9, by = c("gameid", "playid")) %>%
-  left_join(handoff_9, by = c("gameid", "playid"))
-tracking_9 <- tracking_9 %>%
-  left_join(frames_9, by = c("gameid", "playid"))
-tracking_9_filtered <- tracking_9 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_9_rushers <- tracking_9_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_9_rushers <- tracking_9_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_9 <- tracking_9_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_9, "play_speed_9.csv")
-  
-tracking_10 <- tracking_run_2020_10 %>%
-  filter(run_pass == "R")
-first_contact_10 <- tracking_10 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_10 <- tracking_10 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_10 <- tracking_10 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_10 <- play_end_10 %>%
-  left_join(first_contact_10, by = c("gameid", "playid")) %>%
-  left_join(handoff_10, by = c("gameid", "playid"))
-tracking_10 <- tracking_10 %>%
-  left_join(frames_10, by = c("gameid", "playid"))
-tracking_10_filtered <- tracking_10 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_10_rushers <- tracking_10_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_10_rushers <- tracking_10_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_10 <- tracking_10_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_10, "play_speed_10.csv")
-
-tracking_11 <- tracking_run_2020_11 %>%
-  filter(run_pass == "R")
-first_contact_11 <- tracking_11 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_11 <- tracking_11 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_11 <- tracking_11 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_11 <- play_end_11 %>%
-  left_join(first_contact_11, by = c("gameid", "playid")) %>%
-  left_join(handoff_11, by = c("gameid", "playid"))
-tracking_11 <- tracking_11 %>%
-  left_join(frames_11, by = c("gameid", "playid"))
-tracking_11_filtered <- tracking_11 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_11_rushers <- tracking_11_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_11_rushers <- tracking_11_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_11 <- tracking_11_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_11, "play_speed_11.csv")
-
-tracking_12 <- tracking_run_2020_12 %>%
-  filter(run_pass == "R")
-first_contact_12 <- tracking_12 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_12 <- tracking_12 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_12 <- tracking_12 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_12 <- play_end_12 %>%
-  left_join(first_contact_12, by = c("gameid", "playid")) %>%
-  left_join(handoff_12, by = c("gameid", "playid"))
-tracking_12 <- tracking_12 %>%
-  left_join(frames_12, by = c("gameid", "playid"))
-tracking_12_filtered <- tracking_12 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_12_rushers <- tracking_12_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_12_rushers <- tracking_12_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_12 <- tracking_12_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_12, "play_speed_12.csv")
-
-tracking_13 <- tracking_run_2020_13 %>%
-  filter(run_pass == "R")
-first_contact_13 <- tracking_13 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_13 <- tracking_13 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_13 <- tracking_13 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_13 <- play_end_13 %>%
-  left_join(first_contact_13, by = c("gameid", "playid")) %>%
-  left_join(handoff_13, by = c("gameid", "playid"))
-tracking_13 <- tracking_13 %>%
-  left_join(frames_13, by = c("gameid", "playid"))
-tracking_13_filtered <- tracking_13 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_13_rushers <- tracking_13_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_13_rushers <- tracking_13_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_13 <- tracking_13_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_13, "play_speed_13.csv")
-
-tracking_14 <- tracking_run_2020_14 %>%
-  filter(run_pass == "R")
-first_contact_14 <- tracking_14 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_14 <- tracking_14 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_14 <- tracking_14 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_14 <- play_end_14 %>%
-  left_join(first_contact_14, by = c("gameid", "playid")) %>%
-  left_join(handoff_14, by = c("gameid", "playid"))
-tracking_14 <- tracking_14 %>%
-  left_join(frames_14, by = c("gameid", "playid"))
-tracking_14_filtered <- tracking_14 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_14_rushers <- tracking_14_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_14_rushers <- tracking_14_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_14 <- tracking_14_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_14, "play_speed_14.csv")
-
-tracking_15 <- tracking_run_2020_15 %>%
-  filter(run_pass == "R")
-first_contact_15 <- tracking_15 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_15 <- tracking_15 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_15 <- tracking_15 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_15 <- play_end_15 %>%
-  left_join(first_contact_15, by = c("gameid", "playid")) %>%
-  left_join(handoff_15, by = c("gameid", "playid"))
-tracking_15 <- tracking_15 %>%
-  left_join(frames_15, by = c("gameid", "playid"))
-tracking_15_filtered <- tracking_15 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_15_rushers <- tracking_15_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_15_rushers <- tracking_15_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_15 <- tracking_15_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_15, "play_speed_15.csv")
-
-tracking_16 <- tracking_run_2020_16 %>%
-  filter(run_pass == "R")
-first_contact_16 <- tracking_16 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_16 <- tracking_16 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_16 <- tracking_16 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_16 <- play_end_16 %>%
-  left_join(first_contact_16, by = c("gameid", "playid")) %>%
-  left_join(handoff_16, by = c("gameid", "playid"))
-tracking_16 <- tracking_16 %>%
-  left_join(frames_16, by = c("gameid", "playid"))
-tracking_16_filtered <- tracking_16 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_16_rushers <- tracking_16_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_16_rushers <- tracking_16_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_16 <- tracking_16_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_16, "play_speed_16.csv")
-
-tracking_17 <- tracking_run_2020_17 %>%
-  filter(run_pass == "R")
-first_contact_17 <- tracking_17 %>%
-  filter(play_event == "first_contact") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(first_contact_time = time_since_snap)
-play_end_17 <- tracking_17 %>%
-  group_by(gameid, playid) %>%
-  summarize(play_end_frame = max(time_since_snap))
-handoff_17 <- tracking_17 %>%
-  filter(play_event == "handoff") %>%
-  distinct(gameid, playid, time_since_snap) %>%
-  rename(handoff_time = time_since_snap)
-frames_17 <- play_end_17 %>%
-  left_join(first_contact_17, by = c("gameid", "playid")) %>%
-  left_join(handoff_17, by = c("gameid", "playid"))
-tracking_17 <- tracking_17 %>%
-  left_join(frames_17, by = c("gameid", "playid"))
-tracking_17_filtered <- tracking_17 %>%
-  filter(!is.na(handoff_time)) %>%
-  filter(time_since_snap <= first_contact_time) %>%
-  filter(time_since_snap >= handoff_time)
-tracking_17_rushers <- tracking_17_filtered %>%
-  left_join(rushers, by = c("gameid" = "game_id", "playid" = "play_id"))
-tracking_17_rushers <- tracking_17_rushers %>%
-  mutate(is_rusher = ifelse(player_name == player, 1, 0)) %>%
-  filter(is_rusher == 1)
-play_speed_17 <- tracking_17_rushers %>%
-  group_by(gameid, playid, player) %>%
-  summarize(avg_speed = mean(speed),
-            seconds_before_contact = n()/10,
-            ybc = mean(yards_before_contact))
-write.csv(play_speed_17, "play_speed_17.csv")
-
-ID <- c(seq(1, 17))
-
-df_play_speed_all <- list()
-
-for(i in 1:length(ID)){
-  
-  play_speed_temp <- read_csv(paste0("~/tracking-pff/play-speed-week/play_speed_",ID[i],".csv"),
-                               col_types = cols())
-  
-  df_play_speed_all[[i]] <- play_speed_temp
-  
-}
-
-play_speed_all <- rbindlist(df_play_speed_all)
-write.csv(play_speed_all, "play_speed_all.csv")
-
-# play_speed_all <- do.call("rbind", list(play_speed_1, play_speed_2, play_speed_3, 
-#                                         play_speed_4, play_speed_5, play_speed_6, 
-#                                         play_speed_7,play_speed_8, play_speed_9, 
-#                                         play_speed_10, play_speed_11, play_speed_12, play_speed_13,
-#                                         play_speed_14, play_speed_15, play_speed_16, play_speed_17))
-
 play_speed_all %>%
   ggplot(aes(x = avg_speed, y = ybc)) +
   geom_jitter(alpha = 0.5, size = 2) +
@@ -718,7 +119,8 @@ rushing_data_speed <- rushing_data %>%
                 intended_run_position, run_direction, box_players, rpo, yards,
                 yards_after_contact, avoided_tackles, yards_to_go) %>%
   left_join(play_speed_all, by = c("game_id" = "gameid", "play_id" = "playid")) %>%
-  filter(!is.na(avg_speed))
+  filter(!is.na(avg_speed)) %>%
+  dplyr::filter(grepl("HB",position))
 
 rusher_speed <- rushing_data_speed %>%
   group_by(player, offense) %>%
@@ -767,7 +169,7 @@ speed_down_distance %>%
   ggplot(aes(x = distance, y = avg_speed, color = Down)) +
   geom_point(aes(size = rushes), alpha = 0.4) +
   geom_smooth(aes(color = Down), se = FALSE, size = 2) +
-  scale_color_canva(palette = "Fresh and bright") +
+  scale_color_viridis_d() +
   theme_reach() +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
   theme(legend.position = "bottom") +
@@ -792,7 +194,7 @@ speed_yardline_box %>%
   ggplot(aes(x = yards_bin, y = avg_speed, color = `Box Defenders`)) +
   geom_point(aes(size = rushes), alpha = 0.4) +
   geom_smooth(aes(color = `Box Defenders`), se = FALSE, size = 2) +
-  scale_color_canva(palette = "Fresh and bright") +
+  scale_color_viridis_d() +
   theme_reach() +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
   theme(legend.position = "bottom") +
@@ -813,8 +215,6 @@ rushing_data_speed %>%
   geom_boxplot(aes(fill = concept_1)) +
   scale_fill_viridis_d() +
   scale_color_viridis_d() +
-  # scale_fill_brewer(palette = "Paired") +
-  # scale_color_brewer(palette = "Paired") +
   theme_reach() +
   labs(x = "Run Concept",
        y = "Speed Before Contact",
@@ -834,14 +234,16 @@ rushing_data_speed <- rushing_data_speed %>%
 
 colSums(is.na(rushing_data_speed))
 
-others <- c("FB Run", "Undefined", "Sneak")
+rushing_data_speed %>% group_by(concept_1) %>% tally(sort = T)
+
+others <- c("FB Run", "Undefined", "Trick")
 
 rushing_data_speed <- rushing_data_speed %>%
   mutate(concept_1 = ifelse(concept_1 %in% others, "Other", concept_1))
 
 speed_data_select <- rushing_data_speed %>%
   dplyr::select(down, distance, seconds_left_in_half, box_players, 
-                concept_1, avg_speed) %>%
+                concept_1, yards_to_go, avg_speed) %>%
   mutate(label = avg_speed) %>%
   dplyr::select(-avg_speed) %>%
   mutate(concept_1 = as.factor(concept_1)) %>%
@@ -875,10 +277,10 @@ pred_xgb <- predict(speed_mod, test[, 2:19])
 
 yhat <- pred_xgb
 y <- test[, 1]
-postResample(yhat, y) #RMSE = 1.22
+postResample(yhat, y) #RMSE = 1.19
 
-hyper_grid <- expand.grid(max_depth = seq(2, 6, 1),
-                          eta = seq(.18, .28, .01))
+hyper_grid <- expand.grid(max_depth = seq(1, 6, 1),
+                          eta = seq(.15, .3, .01))
 
 xgb_train_rmse <- NULL
 xgb_test_rmse <- NULL
@@ -913,7 +315,7 @@ speed_model <-
     objective = "reg:squarederror",
     early_stopping_rounds = 3,
     max_depth = 2, #ideal max depth
-    eta = 0.24 #ideal eta
+    eta = 0.3 #ideal eta
   )   
 
 vip(speed_model, num_features = 18) +
@@ -929,7 +331,7 @@ pred_xgb <- predict(speed_model, test[, 2:19])
 
 yhat <- pred_xgb
 y <- test[, 1]
-postResample(yhat, y) #RMSE = 1.04
+postResample(yhat, y) #RMSE = 1.07
 
 speed_preds <- as.data.frame(
   matrix(predict(speed_model, as.matrix(trsf %>% select(-label))))
@@ -938,12 +340,12 @@ speed_preds <- as.data.frame(
 
 speed_projs <- cbind(rushing_data_speed, speed_preds)
 
-summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared #0.18
-summary(lm(ybc ~ exp_speed, data = speed_projs))$r.squared #0.00
-summary(lm(ybc ~ avg_speed, data = speed_projs))$r.squared #0.14
-
 speed_projs <- speed_projs %>%
   mutate(speed_oe = avg_speed - exp_speed)
+
+summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared #0.18
+summary(lm(ybc ~ exp_speed, data = speed_projs))$r.squared #0.00
+summary(lm(ybc ~ avg_speed, data = speed_projs))$r.squared #0.16
 
 speed_oe_stats <- speed_projs %>%
   group_by(player, offense) %>%
@@ -971,6 +373,26 @@ speed_oe_stats %>%
   scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
 ggsave('2020-speed-oe.png', width = 15, height = 10, dpi = "retina")
 
+team_speed <- speed_projs %>%
+  group_by(offense) %>%
+  summarize(avg_exp_speed = mean(exp_speed),
+            avg_speed = mean(avg_speed),
+            avg_speed_oe = avg_speed - avg_exp_speed,
+            avg_ybc = mean(ybc)) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
 
-
+team_speed %>%
+  ggplot(aes(x = avg_exp_speed, y = avg_speed)) +
+  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
+  geom_hline(yintercept = mean(team_speed$avg_speed), alpha = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = mean(team_speed$avg_exp_speed), alpha = 0.5, linetype = "dashed") +
+  geom_image(aes(image = team_logo_espn), asp = 16/9, size = 0.05) +
+  theme_reach() +
+  labs(x = "Average Expected Speed",
+       y = "Average Actual Speed",
+       title = "Actual and Expected Speed on Rushing Plays, 2020",
+       subtitle = "Rushing speed determined by a running back's speed from handoff to first contact") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+ 
 
