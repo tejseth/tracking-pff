@@ -1,11 +1,18 @@
+play_speed_all_18 <- read.csv("~/tracking-pff/play_speed_all_18.csv")
 play_speed_all_19 <- read.csv("~/tracking-pff/play_speed_all_19.csv")
 play_speed_all_20 <- read.csv("~/tracking-pff/play_speed_all_20.csv")
 
-play_speed_all <- rbind(play_speed_all_20, play_speed_all_19)
+play_speed_all <- rbind(play_speed_all_20, play_speed_all_19, play_speed_all_18)
+
+write.csv(play_speed_all, "play_speed_all.csv")
+
+summary(lm(ybc ~ avg_speed, data = play_speed_all))$r.squared #0.15
+summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared #0.33
+summary(lm(ybc ~ (avg_speed + seconds_before_contact)^2, data = play_speed_all))
 
 play_speed_all %>%
   ggplot(aes(x = avg_speed, y = ybc)) +
-  geom_jitter(alpha = 0.5, size = 2) +
+  geom_jitter(alpha = 0.5, size = 1.5) +
   geom_smooth(size = 2, color = "darkorange") +
   theme_reach() +
   labs(x = "Average Speed",
@@ -27,11 +34,7 @@ play_speed_all %>%
        subtitle = "2020, Weeks 1-17") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
-  annotate("text", x = 3, y = 50, label = "R^2 = 0.37", size = 5)
-
-summary(lm(ybc ~ avg_speed, data = play_speed_all))$r.squared #0.15
-summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared #0.37
-summary(lm(ybc ~ (avg_speed + seconds_before_contact)^2, data = play_speed_all))
+  annotate("text", x = 3, y = 50, label = "R^2 = 0.33", size = 5)
 
 rushing_data_speed <- rushing_data %>%
   dplyr::select(game_id, play_id, offense, defense, season, week, down, distance, player_id,
@@ -53,6 +56,7 @@ rusher_speed <- rushing_data_speed %>%
   left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
 
 rusher_speed %>%
+  filter(season == 2020) %>%
   ggplot(aes(x = avg_speed, y = avg_ybc)) +
   geom_smooth(method = "lm", size = 1.5, color = "black") +
   geom_hline(yintercept = mean(rusher_speed$avg_ybc), linetype = "dashed", alpha = 0.5) +
@@ -72,7 +76,7 @@ ggsave('2020-speed.png', width = 15, height = 10, dpi = "retina")
 rushing_data_speed$avoided_tackles[is.na(rushing_data_speed$avoided_tackles)] <- 0
 
 rushing_data_speed <- rushing_data_speed %>%
-  dplyr::select(-...1)
+  dplyr::select(-...1, -X1)
 
 colSums(is.na(rushing_data_speed))
 
