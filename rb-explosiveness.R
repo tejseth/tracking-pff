@@ -9,6 +9,8 @@ play_speed_all <- play_speed_all %>%
 
 write.csv(play_speed_all, "play_speed_all.csv")
 
+speed_projs <- read.csv("~/tracking-pff/speed_projs.csv")
+
 summary(lm(ybc ~ avg_speed, data = play_speed_all))$r.squared #0.15
 summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared #0.31
 summary(lm(ybc ~ (avg_speed + seconds_before_contact)^2, data = play_speed_all))
@@ -171,7 +173,7 @@ pred_xgb <- predict(speed_mod, test[, 2:19])
 
 yhat <- pred_xgb
 y <- test[, 1]
-postResample(yhat, y) #RMSE = 1.19
+postResample(yhat, y) #RMSE = 1.16
 
 hyper_grid <- expand.grid(max_depth = seq(1, 6, 1),
                           eta = seq(.15, .3, .01))
@@ -209,7 +211,7 @@ speed_model <-
     objective = "reg:squarederror",
     early_stopping_rounds = 3,
     max_depth = 2, #ideal max depth
-    eta = 0.3 #ideal eta
+    eta = 0.29 #ideal eta
   )   
 
 vip(speed_model, num_features = 18) +
@@ -225,7 +227,7 @@ pred_xgb <- predict(speed_model, test[, 2:19])
 
 yhat <- pred_xgb
 y <- test[, 1]
-postResample(yhat, y) #RMSE = 1.07
+postResample(yhat, y) #RMSE = 1.03
 
 speed_preds <- as.data.frame(
   matrix(predict(speed_model, as.matrix(trsf %>% select(-label))))
@@ -237,18 +239,45 @@ speed_projs <- cbind(rushing_data_speed, speed_preds)
 speed_projs <- speed_projs %>%
   mutate(speed_oe = avg_speed - exp_speed)
 
-summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared #0.18
+write.csv(speed_projs, "speed_projs.csv")
+
+summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared #0.20
 summary(lm(ybc ~ exp_speed, data = speed_projs))$r.squared #0.00
 summary(lm(ybc ~ avg_speed, data = speed_projs))$r.squared #0.16
 
-speed_oe_stats <- speed_projs %>%
+speed_season_stats <- speed_projs %>%
+  group_by(player, season, offense) %>%
+  summarize(rushes = n(),
+            avg_ybc = mean(ybc),
+            exp_speed = mean(exp_speed),
+            avg_speed = mean(avg_speed),
+            avg_ssoe = mean(speed_oe)) %>%
+  arrange(season) %>%
+  group_by(player) %>%
+  mutate(next_rushes = lead(rushes),
+         next_ybc = lead(avg_ybc),
+         next_exp_speed = lead(exp_speed),
+         next_avg_speed = lead(avg_speed),
+         next_ssoe = lead(avg_ssoe)) %>%
+  filter(rushes >= 100) %>%
+  filter(next_rushes >= 100 | is.na(next_rushes))
+
+rb_colors <- rushing_data %>%
   group_by(player, offense) %>%
+  summarize(plays = n()) %>%
+  arrange(-plays) %>%
+  group_by(player) %>%
+  top_n(n = 1) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+
+speed_oe_stats <- speed_projs %>%
+  group_by(player) %>%
   summarize(rushes = n(), 
             avg_speed_oe = mean(speed_oe),
             avg_ybc = mean(ybc)) %>%
-  filter(rushes >= 100) %>%
+  filter(rushes >= 250) %>%
   arrange(-avg_speed_oe) %>%
-  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+  left_join(rb_colors, by = c("player"))
 
 speed_oe_stats %>%
   ggplot(aes(x = avg_speed_oe, y = avg_ybc)) +
@@ -261,8 +290,8 @@ speed_oe_stats %>%
   scale_color_identity(aesthetics = c("fill", "color")) +
   labs(x = "Speed Over Expected",
        y = "Yards Before Contact",
-       title = "How Speed Over Expected Impacts Yards Before Contact, 2020",
-       subtitle = "Minimum of 100 rushes") +
+       title = "How Speed Over Expected Impacts Yards Before Contact, 2018-2020",
+       subtitle = "Minimum of 250 rushes") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
 ggsave('2020-speed-oe.png', width = 15, height = 10, dpi = "retina")

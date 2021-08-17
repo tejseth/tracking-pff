@@ -1,0 +1,341 @@
+---
+title: "Running Back Straight-Line Speed"
+output: html_document
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+library(rdtools)
+library(tidyverse)
+library(ggthemes)
+library(nflfastR)
+library(mltools)
+library(data.table)
+library(xgboost)
+library(caret)
+library(vip)
+library(SHAPforxgboost)
+library(ggimage)
+
+theme_reach <- function() {
+  theme_fivethirtyeight() +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(size = 14, hjust = 0.5),
+      axis.title.x = element_text(size=14),
+      axis.title.y = element_text(size=14),
+      axis.text = element_text(size = 12),
+      strip.text = element_text(size = 14, face = "bold"),
+      legend.text = element_text(size = 12)
+    )
+}
+```
+
+## Loading in the data
+
+Using tracking data, we were able to get a running back's speed from the time of handoff to the time of first contact.
+Doing this allowed us to measure their straight-line speed to see their explsoivness. We then put the data into a play sheet and are able to load that in. 
+
+```{r loading in data, echo = TRUE}
+rushing_data <<- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/rushing.csv.gz"), season_start = 2017, season_end = 2020)
+
+play_speed_all_18 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_18.csv")
+play_speed_all_19 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_19.csv")
+play_speed_all_20 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_20.csv")
+
+play_speed_all <- rbind(play_speed_all_18, play_speed_all_19, play_speed_all_20)
+
+play_speed_all <- play_speed_all %>%
+  dplyr::select(gameid, playid, player, avg_speed, seconds_before_contact, ybc)
+```
+
+```{r chaning rushing data, echo = FALSE}
+rushing_data <- rushing_data %>%
+  mutate(offense = case_when(
+    offense == "SD" ~ "LAC",
+    offense == "BLT" ~ "BAL",
+    offense == "OAK" ~ "LV",
+    offense == "HST" ~ "HOU",
+    offense == "SL" ~ "LA",
+    offense == "CLV" ~ "CLE", 
+    offense == "ARZ" ~ "ARI",
+    TRUE ~ offense
+  )) %>%
+  ungroup()
+
+rushing_data <- rushing_data %>%
+  mutate(defense = case_when(
+    defense == "SD" ~ "LAC",
+    defense == "BLT" ~ "BAL",
+    defense == "OAK" ~ "LV",
+    defense == "HST" ~ "HOU",
+    defense == "SL" ~ "LA",
+    defense == "CLV" ~ "CLE", 
+    defense == "ARZ" ~ "ARI",
+    TRUE ~ defense
+  )) %>%
+  ungroup()
+
+rushing_data <- rushing_data %>%
+  mutate(yards_before_contact = yards - yards_after_contact)
+
+rushers <- rushing_data %>%
+  dplyr::select(game_id, play_id, player, yards_before_contact)
+
+rb_colors <- rushing_data %>%
+  group_by(player, offense) %>%
+  summarize(plays = n()) %>%
+  arrange(-plays) %>%
+  group_by(player) %>%
+  top_n(n = 1) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+```
+
+## Exploratory data analysis
+
+```{r linear regression}
+round(summary(lm(ybc ~ avg_speed, data = play_speed_all))$r.squared, 2)
+round(summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared, 2)
+summary(lm(ybc ~ (avg_speed + seconds_before_contact)^2, data = play_speed_all))
+```
+
+We can look at the plots of these:
+
+```{r plot-1, echo=FALSE, fig.align = "center", out.height= "50%"}
+play_speed_all %>%
+  ggplot(aes(x = avg_speed, y = ybc)) +
+  geom_jitter(alpha = 0.5, size = 1.5) +
+  geom_smooth(size = 2, color = "darkorange") +
+  theme_reach() +
+  labs(x = "Average Speed",
+       y = "Yards Before Contact",
+       title = "Higher Speed Before Contact Leads \n to Higher Yards Before Contact On a Play",
+       subtitle = "2017-2020, Weeks 1-17") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  annotate("text", x = 3, y = 50, label = "R^2 = 0.15", size = 5)
+```
+
+The greater effect is the amount of seconds before contact but both are meaningful for determining yards before contact.
+
+```{r plot-2, echo=FALSE, fig.align = "center", out.height= "50%"}
+play_speed_all %>%
+  ggplot(aes(x = avg_speed, y = ybc)) +
+  geom_jitter(alpha = 0.5, size = 2) +
+  geom_smooth(size = 2, color = "darkgreen") +
+  theme_reach() +
+  labs(x = "Seconds Before Contact",
+       y = "Yards Before Contact",
+       title = "Higher Seconds Before Contact Leads to \n Higher Yards Before Contact On a Play",
+       subtitle = "2017-2020, Weeks 1-17") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  annotate("text", x = 3, y = 50, label = "R^2 = 0.31", size = 5)
+```
+
+## What Influences Speed
+
+Not all speeds are built the same. Based on down, distance, box defenders, yardline and run scheme speed can change for the average running back. 
+
+First we look at down and distance. 
+
+```{r plot 3, echo = FALSE, fig.align = "center", out.height= "50%"}
+rushing_data_speed <- rushing_data %>%
+  dplyr::select(game_id, play_id, offense, defense, season, week, down, distance, player_id,
+                position, quarter, seconds_left_in_quarter, concept_1, concept_2, run_position,
+                intended_run_position, run_direction, box_players, rpo, yards,
+                yards_after_contact, avoided_tackles, yards_to_go) %>%
+  left_join(play_speed_all, by = c("game_id" = "gameid", "play_id" = "playid")) %>%
+  filter(!is.na(avg_speed)) %>%
+  dplyr::filter(grepl("HB",position))
+
+rushing_data_speed$avoided_tackles[is.na(rushing_data_speed$avoided_tackles)] <- 0
+
+rushing_data_speed %>%
+  filter(distance < 15) %>%
+  filter(down %in% c(1, 2, 3)) %>%
+  group_by(down, distance) %>%
+  summarize(rushes = n(),
+            avg_speed = mean(avg_speed)) %>%
+  mutate(Down = as.factor(down)) %>%
+  ggplot(aes(x = distance, y = avg_speed, color = Down)) +
+  geom_point(aes(size = rushes), alpha = 0.4) +
+  geom_smooth(aes(color = Down), se = FALSE, size = 2) +
+  scale_color_viridis_d() +
+  theme_reach() +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
+  theme(legend.position = "bottom") +
+  labs(x = "Yards to Sticks",
+       y = "Average Speed",
+       title = "How Down and Distance \n Impacts Running Back Speed",
+       subtitle = "2020, speed is determined by handoff until first contact") +
+  guides(size = FALSE)
+
+```
+
+Next we can take a look at yardline and box defenders
+
+```{r plot 4, echo = FALSE, fig.align = "center", out.height= "50%"}
+speed_yardline_box <- rushing_data_speed %>%
+  filter(box_players %in% c(5, 6, 7, 8)) %>%
+  mutate(yards_bin = round(yards_to_go / 5) * 5) %>%
+  group_by(yards_bin, box_players) %>%
+  summarize(rushes = n(),
+            avg_speed = mean(avg_speed))
+
+speed_yardline_box$box_players <- factor(speed_yardline_box$box_players, levels = c(5, 6, 7, 8))
+
+speed_yardline_box %>%
+  filter(avg_speed < 5.8) %>%
+  mutate(`Box Defenders` = as.factor(box_players)) %>%
+  ggplot(aes(x = yards_bin, y = avg_speed, color = `Box Defenders`)) +
+  geom_point(aes(size = rushes), alpha = 0.4) +
+  geom_smooth(aes(color = `Box Defenders`), se = FALSE, size = 2) +
+  scale_color_viridis_d() +
+  theme_reach() +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
+  theme(legend.position = "bottom") +
+  labs(x = "Yards From Endzone",
+       y = "Average Speed",
+       title = "How Yardline and Box Defenders Impacts \n Running Back Speed",
+       subtitle = "2020, speed is determined by handoff until first contact") +
+  guides(size = FALSE)
+```
+
+Most importantly, we can look at how different run concepts impact speed. 
+
+```{r plot 5, echo = FALSE, fig.align = "center", out.height= "50%"}
+rushing_data_speed %>%
+  filter(concept_1 %in% c("Outside Zone", "Inside Zone", "Man", "Power", "Pull Lead", "Counter", "Draw", "Trap")) %>%
+  group_by(concept_1) %>%
+  mutate(speed = mean(avg_speed)) %>%
+  ungroup() %>%
+  mutate(concept_1 = fct_reorder(concept_1, speed)) %>%
+  ggplot(aes(x = concept_1, y = avg_speed)) +
+  geom_violin(aes(color = concept_1)) +
+  geom_boxplot(aes(fill = concept_1)) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  theme_reach() +
+  labs(x = "Run Concept",
+       y = "Speed Before Contact",
+       title = "How Run Concept Affects a Running \n Back's Speed Through the Hole",
+       subtitle = "2020, eight most common run types selected") +
+  theme(axis.text.x = element_text(angle = -45, size = 12))
+```
+
+## Straight-Line Speed Over Expected (SSOE)
+
+To adjust for all the factors listed earlier, we can use an xgboost model to created straight-line speed over expected, which is better at predicting yards before contact and more predictive than of next year's yards before contact (YBC).
+
+```{r SSOE loading, echo = TRUE}
+speed_projs <- read.csv("~/tracking-pff/speed_projs.csv")
+
+round(summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared, 2)
+round(summary(lm(ybc ~ avg_speed, data = speed_projs))$r.squared, 2)
+
+
+speed_season_stats <- speed_projs %>%
+  group_by(player, season, offense) %>%
+  summarize(rushes = n(),
+            avg_ybc = mean(ybc),
+            exp_speed = mean(exp_speed),
+            avg_speed = mean(avg_speed),
+            avg_ssoe = mean(speed_oe)) %>%
+  arrange(season) %>%
+  group_by(player) %>%
+  mutate(next_rushes = lead(rushes),
+         next_ybc = lead(avg_ybc),
+         next_exp_speed = lead(exp_speed),
+         next_avg_speed = lead(avg_speed),
+         next_ssoe = lead(avg_ssoe)) %>%
+  filter(rushes >= 100) %>%
+  filter(next_rushes >= 100 | is.na(next_rushes)) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+
+round(summary(lm(next_ybc ~ avg_ssoe, data = speed_season_stats))$r.squared, 2)
+round(summary(lm(next_ybc ~ exp_speed, data = speed_season_stats))$r.squared, 2)
+round(summary(lm(next_ybc ~ avg_speed, data = speed_season_stats))$r.squared, 2)
+round(summary(lm(next_ybc ~ avg_ybc, data = speed_season_stats))$r.squared, 2)
+```
+
+Now that we've established what speed over expected can be used for, we can graph how it impacts yards before contact from 2018 to 2020. 
+
+```{r plot 6, echo = FALSE, fig.align = "center", out.height= "50%"}
+speed_oe_stats <- speed_projs %>%
+  group_by(player) %>%
+  summarize(rushes = n(), 
+            avg_speed_oe = mean(speed_oe),
+            avg_ybc = mean(ybc)) %>%
+  filter(rushes >= 250) %>%
+  arrange(-avg_speed_oe) %>%
+  left_join(rb_colors, by = c("player"))
+
+speed_oe_stats %>%
+  ggplot(aes(x = avg_speed_oe, y = avg_ybc)) +
+  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
+  geom_hline(yintercept = mean(speed_season_stats$avg_ybc), linetype = "dashed", alpha = 0.5) +
+  geom_vline(xintercept = mean(speed_season_stats$avg_speed_oe), linetype = "dashed", alpha = 0.5) +
+  geom_point(aes(fill = team_color, color = team_color2, size = rushes), shape = 21, alpha = 0.9) +
+  ggrepel::geom_text_repel(aes(label = player), size = 3, box.padding = 0.3) +
+  theme_reach() +
+  scale_color_identity(aesthetics = c("fill", "color")) +
+  labs(x = "Speed Over Expected",
+       y = "Yards Before Contact",
+       title = "How Speed Over Expected \n Impacts Yards Before Contact, 2018-2020",
+       subtitle = "Minimum of 250 rushes") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+```
+
+Looking at 2018 through 2020 is interesting, but focusing on just this past year is intriguing too
+
+```{r plot 7, echo = FALSE, fig.align = "center", out.height= "50%"}
+
+speed_season_stats %>%
+  filter(season == 2020) %>%
+  ggplot(aes(x = avg_ssoe, y = avg_ybc)) +
+  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
+  geom_hline(yintercept = mean(speed_season_stats$avg_ybc), linetype = "dashed", alpha = 0.5) +
+  geom_vline(xintercept = mean(speed_season_stats$avg_ssoe), linetype = "dashed", alpha = 0.5) +
+  geom_point(aes(fill = team_color, color = team_color2, size = rushes), shape = 21, alpha = 0.9) +
+  ggrepel::geom_text_repel(aes(label = player), size = 3, box.padding = 0.3) +
+  theme_reach() +
+  scale_color_identity(aesthetics = c("fill", "color")) +
+  labs(x = "Speed Over Expected",
+       y = "Yards Before Contact",
+       title = "How Speed Over Expected \n Impacted Yards Before Contact in 2020",
+       subtitle = "Minimum of 100 rushes") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+```
+
+We can also look at it froma  team level
+
+```{r plot 8, echo = FALSE, fig.align = "center", out.height= "50%"}
+
+team_speed <- speed_projs %>%
+  group_by(offense) %>%
+  summarize(avg_exp_speed = mean(exp_speed),
+            avg_speed = mean(avg_speed),
+            avg_speed_oe = avg_speed - avg_exp_speed,
+            avg_ybc = mean(ybc)) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+
+team_speed %>%
+  ggplot(aes(x = avg_exp_speed, y = avg_speed)) +
+  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
+  geom_hline(yintercept = mean(team_speed$avg_speed), alpha = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = mean(team_speed$avg_exp_speed), alpha = 0.5, linetype = "dashed") +
+  geom_image(aes(image = team_logo_espn), asp = 16/9, size = 0.05) +
+  theme_reach() +
+  labs(x = "Average Expected Speed",
+       y = "Average Actual Speed",
+       title = "Actual and Expected Speed on Rushing Plays, 2020",
+       subtitle = "Rushing speed determined by a \n running back's speed from handoff to first contact") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+```
+
+
