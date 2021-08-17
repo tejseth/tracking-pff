@@ -1,13 +1,16 @@
-play_speed_all_18 <- read.csv("~/tracking-pff/play_speed_all_18.csv")
-play_speed_all_19 <- read.csv("~/tracking-pff/play_speed_all_19.csv")
-play_speed_all_20 <- read.csv("~/tracking-pff/play_speed_all_20.csv")
+play_speed_all_18 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_18.csv")
+play_speed_all_19 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_19.csv")
+play_speed_all_20 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_20.csv")
 
-play_speed_all <- rbind(play_speed_all_20, play_speed_all_19, play_speed_all_18)
+play_speed_all <- rbind(play_speed_all_18, play_speed_all_19, play_speed_all_20)
+
+play_speed_all <- play_speed_all %>%
+  dplyr::select(gameid, playid, player, avg_speed, seconds_before_contact, ybc)
 
 write.csv(play_speed_all, "play_speed_all.csv")
 
 summary(lm(ybc ~ avg_speed, data = play_speed_all))$r.squared #0.15
-summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared #0.33
+summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared #0.31
 summary(lm(ybc ~ (avg_speed + seconds_before_contact)^2, data = play_speed_all))
 
 play_speed_all %>%
@@ -18,7 +21,7 @@ play_speed_all %>%
   labs(x = "Average Speed",
        y = "Yards Before Contact",
        title = "Higher Speed Before Contact Leads to Higher Yards Before Contact On a Play",
-       subtitle = "2020, Weeks 1-17") +
+       subtitle = "2017-2020, Weeks 1-17") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
   annotate("text", x = 3, y = 50, label = "R^2 = 0.15", size = 5)
@@ -31,10 +34,10 @@ play_speed_all %>%
   labs(x = "Seconds Before Contact",
        y = "Yards Before Contact",
        title = "Higher Seconds Before Contact Leads to Higher Yards Before Contact On a Play",
-       subtitle = "2020, Weeks 1-17") +
+       subtitle = "2017-2020, Weeks 1-17") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
-  annotate("text", x = 3, y = 50, label = "R^2 = 0.33", size = 5)
+  annotate("text", x = 3, y = 50, label = "R^2 = 0.31", size = 5)
 
 rushing_data_speed <- rushing_data %>%
   dplyr::select(game_id, play_id, offense, defense, season, week, down, distance, player_id,
@@ -45,50 +48,17 @@ rushing_data_speed <- rushing_data %>%
   filter(!is.na(avg_speed)) %>%
   dplyr::filter(grepl("HB",position))
 
-rusher_speed <- rushing_data_speed %>%
-  group_by(player, offense, season) %>%
-  summarize(rushes = n(),
-            avg_speed = mean(avg_speed, na.rm = T),
-            avg_seconds_bc = mean(seconds_before_contact, na.rm = T),
-            avg_ybc = mean(ybc, na.rm = T)) %>%
-  filter(rushes >= 100) %>% 
-  arrange(-avg_speed) %>%
-  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
-
-rusher_speed %>%
-  filter(season == 2020) %>%
-  ggplot(aes(x = avg_speed, y = avg_ybc)) +
-  geom_smooth(method = "lm", size = 1.5, color = "black") +
-  geom_hline(yintercept = mean(rusher_speed$avg_ybc), linetype = "dashed", alpha = 0.5) +
-  geom_vline(xintercept = mean(rusher_speed$avg_speed), linetype = "dashed", alpha = 0.5) +
-  geom_point(aes(fill = team_color, color = team_color2, size = rushes), shape = 21, alpha = 0.9) +
-  ggrepel::geom_text_repel(aes(label = player), size = 5, box.padding = 0.3) +
-  theme_reach() +
-  scale_color_identity(aesthetics = c("fill", "color")) +
-  labs(x = "Average Speed Before Contact",
-       y = "Yards Before Contact",
-       title = "Average Speed and Yards Before Contact, 2020",
-       subtitle = "Average speed before contract determined by speed from handoff to first contact") +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
-ggsave('2020-speed.png', width = 15, height = 10, dpi = "retina")
-
 rushing_data_speed$avoided_tackles[is.na(rushing_data_speed$avoided_tackles)] <- 0
-
-rushing_data_speed <- rushing_data_speed %>%
-  dplyr::select(-...1, -X1)
 
 colSums(is.na(rushing_data_speed))
 
-speed_down_distance <- rushing_data_speed %>%
+rushing_data_speed %>%
   filter(distance < 15) %>%
   filter(down %in% c(1, 2, 3)) %>%
   group_by(down, distance) %>%
   summarize(rushes = n(),
-            avg_speed = mean(avg_speed))
-
-speed_down_distance %>%
-  filter(avg_speed > 4 & avg_speed < 6) %>%
+            avg_speed = mean(avg_speed)) %>%
+  #filter(avg_speed > 4 & avg_speed < 6) %>%
   mutate(Down = as.factor(down)) %>%
   ggplot(aes(x = distance, y = avg_speed, color = Down)) +
   geom_point(aes(size = rushes), alpha = 0.4) +
