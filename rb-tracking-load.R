@@ -2507,7 +2507,7 @@ for(i in 1:length(ID)){
   play_speed_temp_17 <- read_csv(paste0("~/tracking-pff/play-speed-week/play_speed_",ID[i],"_17.csv"),
                                  col_types = cols())
   
-  df_play_speed_all_17[[i]] <- play_speed_temp_19
+  df_play_speed_all_17[[i]] <- play_speed_temp_17
   
 }
 
