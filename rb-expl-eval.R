@@ -170,7 +170,7 @@ season_speed <- season_speed %>%
 season_speed %>%
   filter(combine_season >= 2018) %>%
   mutate(label = paste0(player, ", ", substring(season, 3, 4))) %>%
-  ggplot(aes(x = speed_score, y = avg_speed)) +
+  ggplot(aes(x = cone, y = avg_speed)) +
   geom_smooth(se = FALSE, size = 2, color = "black") +
   geom_point(aes(size = rushes), fill = "gray", color = "black", shape = 21) +
   ggrepel::geom_text_repel(aes(label = label), size = 4, box.padding = 0.35, max.overlaps = 4) +
