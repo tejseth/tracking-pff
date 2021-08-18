@@ -87,6 +87,30 @@ team_speed %>%
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
 
+game_speed <- speed_projs_filtered %>%
+  group_by(player, offense, defense, season, week, game_id) %>%
+  summarize(game_rushes = n(),
+            game_exp_speed = mean(exp_speed),
+            game_avg_speed = mean(avg_speed),
+            game_avg_speed_oe = mean(speed_oe)) %>%
+  arrange(season, week) %>%
+  group_by(player, season) %>%
+  mutate(next_rushes = lead(game_rushes),
+         next_exp_speed = lead(game_exp_speed),
+         next_avg_speed = lead(game_avg_speed),
+         next_avg_speed_oe = lead(game_avg_speed_oe)) %>%
+  filter(game_rushes >= 10) %>%
+  filter(next_rushes >= 10) %>%
+  left_join(teams_logos_select, by = c("defense" = "team_abbr")) %>%
+  select(-team_color, defense_logo = team_logo_espn) %>%
+  left_join(teams_logos_select, by = c("offense" = "team_abbr")) %>%
+  select(-team_logo_espn)
+
+summary(lm(next_rushes ~ game_rushes, data = game_speed))$r.squared #0.06
+summary(lm(next_exp_speed ~ game_exp_speed, data = game_speed))$r.squared #0.15
+summary(lm(next_avg_speed ~ game_avg_speed, data = game_speed))$r.squared #0.23
+summary(lm(next_avg_speed_oe ~ game_avg_speed_oe, data = game_speed))$r.squared #0.22
+
 combine_data <- pull_api("/v1/player_combine_results")$player_combine_results
 pro_day_data <- pull_api("/v1/player_pro_day")$player_pro_day
 
@@ -263,42 +287,37 @@ twenty_rank <- season_speed_to_40 %>%
   mutate(twenty_rank = row_number()) %>%
   dplyr::select(twenty_rank, adj_twenty = twenty)
 
-season_speed_to_40 <- speed_to_40 %>%
+season_speed_to_40 <- season_speed_to_40 %>%
   arrange(-avg_speed_oe) %>%
-  mutate(speed_rank = row_number()) %>%
+  mutate(speed_perc = round(100*range01(avg_speed_oe), 1),
+         speed_rank = row_number()) %>%
   left_join(forty_rank, by = c("speed_rank" = "forty_rank")) %>%
   left_join(twenty_rank, by = c("speed_rank" = "twenty_rank"))
 
+lm_40 <- lm(adj_forty ~ speed_perc, data = season_speed_to_40)
+summary(lm_40)
+
+game_speed_to_40 <-  speed_projs_filtered %>%
+  group_by(player, player_id, season, game_id, defense) %>%
+  summarize(rushes = n(),
+            exp_speed = mean(exp_speed),
+            avg_speed = mean(avg_speed),
+            avg_speed_oe = mean(speed_oe)) %>%
+  filter(rushes >= 10) %>%
+  mutate(speed_perc = round(100*(avg_speed_oe-min(game_speed_to_40$avg_speed_oe))/(max(game_speed_to_40$avg_speed_oe)-min(game_speed_to_40$avg_speed_oe)), 1))
+
+games_40 <- predict(lm_40, newdata = game_speed_to_40)
+
+game_speed_to_40 <- cbind(game_speed_to_40, games_40)
+
+game_speed_to_40 <- game_speed_to_40 %>%
+  rename(game_forty = ...11)
 
 
 ############################################################################
 
 teams_logos_select <- teams_colors_logos %>%
   dplyr::select(team_abbr, team_logo_espn, team_color)
-
-game_speed <- speed_projs_filtered %>%
-  group_by(player, offense, defense, season, week, game_id) %>%
-  summarize(game_rushes = n(),
-            game_exp_speed = mean(exp_speed),
-            game_avg_speed = mean(avg_speed),
-            game_avg_speed_oe = mean(speed_oe)) %>%
-  arrange(season, week) %>%
-  group_by(player, season) %>%
-  mutate(next_rushes = lead(game_rushes),
-         next_exp_speed = lead(game_exp_speed),
-         next_avg_speed = lead(game_avg_speed),
-         next_avg_speed_oe = lead(game_avg_speed_oe)) %>%
-  filter(game_rushes >= 10) %>%
-  filter(next_rushes >= 10) %>%
-  left_join(teams_logos_select, by = c("defense" = "team_abbr")) %>%
-  select(-team_color, defense_logo = team_logo_espn) %>%
-  left_join(teams_logos_select, by = c("offense" = "team_abbr")) %>%
-  select(-team_logo_espn)
-
-summary(lm(next_rushes ~ game_rushes, data = game_speed))$r.squared #0.06
-summary(lm(next_exp_speed ~ game_exp_speed, data = game_speed))$r.squared #0.15
-summary(lm(next_avg_speed ~ game_avg_speed, data = game_speed))$r.squared #0.23
-summary(lm(next_avg_speed_oe ~ game_avg_speed_oe, data = game_speed))$r.squared #0.22
 
 the_rusher <- "Alvin Kamara"
 the_season <- 2020
