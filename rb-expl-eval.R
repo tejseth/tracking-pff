@@ -229,8 +229,8 @@ ryoe_40_stats %>%
   filter(nfl_rushes >= 150) %>%
   ggplot(aes(x = ncaa_expl_rate, y = twenty)) +
   geom_smooth(method = "lm", size = 2, se = FALSE, color = "black") +
-  geom_hline(yintercept = mean(ryoe_40_stats$twenty), linetype = "dashed", alpha = 0.5) +
-  geom_vline(xintercept = mean(ryoe_40_stats$ncaa_expl_rate), linetype = "dashed", alpha = 0.5) +
+  geom_hline(yintercept = mean(ryoe_40_stats$twenty, na.rm = T), linetype = "dashed", alpha = 0.5) +
+  geom_vline(xintercept = mean(ryoe_40_stats$ncaa_expl_rate, na.rm = T), linetype = "dashed", alpha = 0.5) +
   geom_point(aes(fill = color, color = alt_color, size = ncaa_rushes), shape = 21, alpha = 0.8) +
   ggrepel::geom_text_repel(aes(label = player), size = 4.5, box.padding = 0.35) +
   scale_color_identity(aesthetics = c("fill", "color")) +
