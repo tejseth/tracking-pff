@@ -153,7 +153,7 @@ combine_combine <- function(combine_data.frame, pro_day_data.frame) {
 combine_all_results <- combine_combine(combine_data, pro_day_data)
 
 combine_select <- combine_all_results %>%
-  dplyr::select(player_id, forty, combine_season = season, combine_weight = weight, position) %>%
+  dplyr::select(player_id, forty, combine_season = season, cone, combine_weight = weight, position) %>%
   mutate(speed_score = forty / combine_weight)
 
 season_speed <- speed_projs_filtered %>%
