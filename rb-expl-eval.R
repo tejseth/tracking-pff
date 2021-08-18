@@ -153,7 +153,7 @@ combine_combine <- function(combine_data.frame, pro_day_data.frame) {
 combine_all_results <- combine_combine(combine_data, pro_day_data)
 
 combine_select <- combine_all_results %>%
-  dplyr::select(player_id, forty, combine_season = season, cone, combine_weight = weight, position) %>%
+  dplyr::select(player_id, forty, combine_season = season, twenty, ten, combine_weight = weight, position) %>%
   mutate(speed_score = forty / combine_weight)
 
 season_speed <- speed_projs_filtered %>%
@@ -166,20 +166,6 @@ season_speed <- speed_projs_filtered %>%
 
 season_speed <- season_speed %>%
   left_join(combine_select, by = c("player_id"))
-
-season_speed %>%
-  filter(combine_season >= 2018) %>%
-  mutate(label = paste0(player, ", ", substring(season, 3, 4))) %>%
-  ggplot(aes(x = cone, y = avg_speed)) +
-  geom_smooth(se = FALSE, size = 2, color = "black") +
-  geom_point(aes(size = rushes), fill = "gray", color = "black", shape = 21) +
-  ggrepel::geom_text_repel(aes(label = label), size = 4, box.padding = 0.35, max.overlaps = 4) +
-  theme_reach() +
-  labs(x = "Speed Score",
-       y = "Season Speed Over Expected",
-       title = "The Relationship of Speed Score and Speed Over Expected",
-       subtitle = "2018-2020, minimum of 100 rushes") +
-  scale_x_reverse()
 
 ncaa_ryoe_projs <- read_csv("~/RYOE/ncaa_ryoe_projs.csv")
 nfl_ryoe_projs <- read.csv("~/in-season/in-season-data/nfl_ryoe_projs.csv")
@@ -205,6 +191,8 @@ ryoe_40_stats <- ncaa_ryoe_projs %>%
   left_join(nfl_ryoe_stats, by = c("player", "player_id"))
 
 summary(lm(forty ~ ncaa_expl_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.15
+summary(lm(twenty ~ ncaa_expl_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.22
+summary(lm(ten ~ ncaa_expl_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.13
 summary(lm(forty ~ ncaa_ryoe, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.15
 summary(lm(forty ~ ncaa_bad_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.04
 
@@ -249,6 +237,40 @@ nfl_40 %>%
        title = "Forty Time Only Predicts Bad Run Rate in the NFL",
        subtitle = "2014-2020, minimum of 200 NFL rushes")
 
+range01 <- function(x){(x-min(x))/(max(x)-min(x))}
+
+season_speed_to_40 <- speed_projs_filtered %>%
+  group_by(player, player_id, season, offense) %>%
+  summarize(rushes = n(),
+            exp_speed = mean(exp_speed),
+            avg_speed = mean(avg_speed),
+            avg_speed_oe = mean(speed_oe)) %>%
+  filter(rushes >= 50) %>%
+  left_join(combine_select, by = c("player_id")) %>%
+  dplyr::select(-position, -combine_weight, -speed_score) %>%
+  ungroup()
+
+season_speed_to_40$forty[is.na(season_speed_to_40$forty)] <- mean(season_speed_to_40$forty, na.rm = T)
+season_speed_to_40$twenty[is.na(season_speed_to_40$twenty)] <- mean(season_speed_to_40$twenty, na.rm = T)
+season_speed_to_40$ten[is.na(season_speed_to_40$ten)] <- mean(season_speed_to_40$ten, na.rm = T)
+
+forty_rank <- season_speed_to_40 %>%
+  arrange(forty) %>%
+  mutate(forty_rank = row_number()) %>%
+  dplyr::select(forty_rank, adj_forty = forty)
+twenty_rank <- season_speed_to_40 %>%
+  arrange(twenty) %>%
+  mutate(twenty_rank = row_number()) %>%
+  dplyr::select(twenty_rank, adj_twenty = twenty)
+
+season_speed_to_40 <- speed_to_40 %>%
+  arrange(-avg_speed_oe) %>%
+  mutate(speed_rank = row_number()) %>%
+  left_join(forty_rank, by = c("speed_rank" = "forty_rank")) %>%
+  left_join(twenty_rank, by = c("speed_rank" = "twenty_rank"))
+
+
+
 ############################################################################
 
 teams_logos_select <- teams_colors_logos %>%
@@ -278,7 +300,7 @@ summary(lm(next_exp_speed ~ game_exp_speed, data = game_speed))$r.squared #0.15
 summary(lm(next_avg_speed ~ game_avg_speed, data = game_speed))$r.squared #0.23
 summary(lm(next_avg_speed_oe ~ game_avg_speed_oe, data = game_speed))$r.squared #0.22
 
-the_rusher <- "Dalvin Cook"
+the_rusher <- "Alvin Kamara"
 the_season <- 2020
 player_season <- game_speed %>%
   filter(player == the_rusher) %>%
