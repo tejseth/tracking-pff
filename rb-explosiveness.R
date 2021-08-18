@@ -241,85 +241,13 @@ speed_projs <- speed_projs %>%
 
 write.csv(speed_projs, "speed_projs.csv")
 
-summary(lm(ybc ~ speed_oe, data = speed_projs))$r.squared #0.20
-summary(lm(ybc ~ exp_speed, data = speed_projs))$r.squared #0.00
-summary(lm(ybc ~ avg_speed, data = speed_projs))$r.squared #0.16
 
-speed_season_stats <- speed_projs %>%
-  group_by(player, season, offense) %>%
-  summarize(rushes = n(),
-            avg_ybc = mean(ybc),
-            exp_speed = mean(exp_speed),
-            avg_speed = mean(avg_speed),
-            avg_ssoe = mean(speed_oe)) %>%
-  arrange(season) %>%
-  group_by(player) %>%
-  mutate(next_rushes = lead(rushes),
-         next_ybc = lead(avg_ybc),
-         next_exp_speed = lead(exp_speed),
-         next_avg_speed = lead(avg_speed),
-         next_ssoe = lead(avg_ssoe)) %>%
-  filter(rushes >= 100) %>%
-  filter(next_rushes >= 100 | is.na(next_rushes))
 
-rb_colors <- rushing_data %>%
-  group_by(player, offense) %>%
-  summarize(plays = n()) %>%
-  arrange(-plays) %>%
-  group_by(player) %>%
-  top_n(n = 1) %>%
-  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
 
-speed_oe_stats <- speed_projs %>%
-  group_by(player) %>%
-  summarize(rushes = n(), 
-            avg_speed_oe = mean(speed_oe),
-            avg_ybc = mean(ybc)) %>%
-  filter(rushes >= 250) %>%
-  arrange(-avg_speed_oe) %>%
-  left_join(rb_colors, by = c("player"))
 
-speed_oe_stats %>%
-  ggplot(aes(x = avg_speed_oe, y = avg_ybc)) +
-  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
-  geom_hline(yintercept = mean(speed_oe_stats$avg_ybc), linetype = "dashed", alpha = 0.5) +
-  geom_vline(xintercept = mean(speed_oe_stats$avg_speed_oe), linetype = "dashed", alpha = 0.5) +
-  geom_point(aes(fill = team_color, color = team_color2, size = rushes), shape = 21, alpha = 0.9) +
-  ggrepel::geom_text_repel(aes(label = player), size = 5, box.padding = 0.3) +
-  theme_reach() +
-  scale_color_identity(aesthetics = c("fill", "color")) +
-  labs(x = "Speed Over Expected",
-       y = "Yards Before Contact",
-       title = "How Speed Over Expected Impacts Yards Before Contact, 2018-2020",
-       subtitle = "Minimum of 250 rushes") +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
-ggsave('2020-speed-oe.png', width = 15, height = 10, dpi = "retina")
 
-team_speed <- speed_projs %>%
-  group_by(offense) %>%
-  summarize(avg_exp_speed = mean(exp_speed),
-            avg_speed = mean(avg_speed),
-            avg_speed_oe = avg_speed - avg_exp_speed,
-            avg_ybc = mean(ybc)) %>%
-  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
 
-team_speed %>%
-  ggplot(aes(x = avg_exp_speed, y = avg_speed)) +
-  geom_smooth(method = "lm", size = 1.5, color = "black", se = FALSE) +
-  geom_hline(yintercept = mean(team_speed$avg_speed), alpha = 0.5, linetype = "dashed") +
-  geom_vline(xintercept = mean(team_speed$avg_exp_speed), alpha = 0.5, linetype = "dashed") +
-  geom_image(aes(image = team_logo_espn), asp = 16/9, size = 0.05) +
-  theme_reach() +
-  labs(x = "Average Expected Speed",
-       y = "Average Actual Speed",
-       title = "Actual and Expected Speed on Rushing Plays, 2020",
-       subtitle = "Rushing speed determined by a running back's speed from handoff to first contact") +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
 
-combine_data <- pull_api("/v1/player_combine_results")$player_combine_results
-pro_day_data <- pull_api("/v1/player_pro_day")$player_pro_day
- 
+
 
 
