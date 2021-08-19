@@ -10,6 +10,8 @@ library(vip)
 library(SHAPforxgboost)
 library(ggimage)
 library(ggcorrplot)
+library(lme4)
+library(merTools)
 
 trace(pull_ngs,edit=TRUE)
 
@@ -28,6 +30,7 @@ theme_reach <- function() {
 }
 
 rushing_data <<- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/rushing.csv.gz"), season_start = 2017, season_end = 2020)
+
 
 rushing_data <- rushing_data %>%
   mutate(offense = case_when(

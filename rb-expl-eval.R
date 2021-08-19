@@ -213,10 +213,11 @@ ryoe_40_stats <- ncaa_ryoe_projs %>%
   filter(!is.na(forty)) %>%
   filter(position == "HB") %>%
   left_join(nfl_ryoe_stats, by = c("player", "player_id")) %>%
-  left_join(ncaa_teams_colors_logos, by = c("offense" = "team"))
+  left_join(ncaa_teams_colors_logos, by = c("offense" = "team")) %>%
+  mutate(flying_20 = forty - twenty)
 
-summary(lm(forty ~ ncaa_expl_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.15
-summary(lm(twenty ~ ncaa_expl_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.22
+summary(lm(forty ~ (ncaa_expl_rate + combine_weight)^2, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.22
+summary(lm(twenty ~ (ncaa_expl_rate + combine_weight)^2, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.30
 summary(lm(ten ~ ncaa_expl_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.13
 summary(lm(forty ~ ncaa_ryoe, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.15
 summary(lm(forty ~ ncaa_bad_rate, data = ryoe_40_stats, weights = ncaa_rushes))$r.squared #0.04
@@ -229,7 +230,7 @@ ryoe_40_stats %>%
   filter(nfl_rushes >= 150) %>%
   ggplot(aes(x = ncaa_expl_rate, y = twenty)) +
   geom_smooth(method = "lm", size = 2, se = FALSE, color = "black") +
-  geom_hline(yintercept = mean(ryoe_40_stats$twenty, na.rm = T), linetype = "dashed", alpha = 0.5) +
+  geom_hline(yintercept = mean(ryoe_40_stats$twenty, na.rm = T) - 0.018, linetype = "dashed", alpha = 0.5) +
   geom_vline(xintercept = mean(ryoe_40_stats$ncaa_expl_rate, na.rm = T), linetype = "dashed", alpha = 0.5) +
   geom_point(aes(fill = color, color = alt_color, size = ncaa_rushes), shape = 21, alpha = 0.8) +
   ggrepel::geom_text_repel(aes(label = player), size = 4.5, box.padding = 0.35) +
@@ -242,7 +243,7 @@ ryoe_40_stats %>%
        title = "Explosive Run Rate Predicts a Running Back's Twenty-Yard Combine Split Well",
        subtitle = "2014-2020, bubble size is amount of rushes in college",
        caption = "By Tej Seth | @tejfbanalytics | PFF") +
-  annotate("text", x = 0.03, 2.56, label = "R^2 = 0.22", size = 5)
+  annotate("text", x = 0.035, 2.57, label = "R^2 = 0.22", size = 5)
 ggsave('college-20.png', width = 15, height = 10, dpi = "retina")
   
 
@@ -347,19 +348,19 @@ game_speed_to_40 <- game_speed_to_40 %>%
 
 the_rusher <- "Derrick Henry"
 the_season <- 2020
-player_season <- game_speed_to_40 %>%
+player_games <- game_speed_to_40 %>%
   filter(player == the_rusher) %>%
   filter(season == the_season)
-the_weeks <- unique(player_season$week)
-league_season <- game_speed_to_40 %>%
+the_weeks <- unique(player_games$week)
+league_games <- game_speed_to_40 %>%
   filter(player != the_rusher) %>%
   filter(season == the_season) %>%
   filter(week %in% the_weeks)
 
 ggplot() +
-  geom_jitter(data = league_season, aes(x = as.factor(week), y = game_forty), size = 4, color = "black", alpha = 0.2, width = 0.05) +
-  geom_line(data = player_season, aes(x = as.factor(week), color = team_color, y = game_forty), size = 2, group = 1) +
-  geom_image(data = player_season, aes(x = as.factor(week), image = defense_logo, y = game_forty), asp = 16/9, size = 0.05) +
+  geom_jitter(data = league_games, aes(x = as.factor(week), y = game_forty), size = 4, color = "black", alpha = 0.2, width = 0.05) +
+  geom_line(data = player_games, aes(x = as.factor(week), color = team_color, y = game_forty), size = 2, group = 1) +
+  geom_image(data = player_games, aes(x = as.factor(week), image = defense_logo, y = game_forty), asp = 16/9, size = 0.05) +
   theme_reach() +
   scale_color_identity() +
   scale_y_reverse(breaks = scales::pretty_breaks(n = 5)) +
@@ -368,6 +369,27 @@ ggplot() +
        y = "Game-Adjusted 40 Time",
        title = paste0(the_rusher, "'s Game-Adjusted 40 Yard Dash Time, ", the_season),
        subtitle = "Black dots listed for every other rusher with at least 10 rushes")
+
+player_season <- season_speed_to_40 %>%
+  filter(player == the_rusher) %>%
+  left_join(teams_colors_logos, by = c("offense" = "team_abbr"))
+the_seasons <- unique(player_season$season)
+league_season <- season_speed_to_40 %>%
+  filter(player != the_rusher) %>%
+  filter(season %in% the_seasons)
+
+ggplot() +
+  geom_jitter(data = league_season, aes(x = as.factor(season), y = adj_forty), size = 4, color = "black", alpha = 0.2, width = 0.025) +
+  geom_line(data = player_season, aes(x = as.factor(season), color = team_color, y = adj_forty), size = 2, group = 1) +
+  geom_image(data = player_season, aes(x = as.factor(season), image = team_logo_espn, y = adj_forty), asp = 16/9, size = 0.05) +
+  theme_reach() +
+  scale_color_identity() +
+  scale_y_reverse(breaks = scales::pretty_breaks(n = 5)) +
+  geom_hline(yintercept = mean(game_speed_to_40$game_forty)) +
+  labs(x = "Season",
+       y = "Season-Adjusted 40 Time",
+       title = paste0(the_rusher, "'s Season-Adjusted 40 Yard Dash Time by Season"),
+       subtitle = "Black dots listed for every other rusher with at least 50 rushes")
 
 
 
