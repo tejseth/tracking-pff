@@ -3,7 +3,7 @@ speed_projs <- read.csv("~/tracking-pff/speed_projs.csv")
 speed_projs_filtered <- speed_projs %>%
   filter(seconds_before_contact >= 0.5 & seconds_before_contact <= 5.7)
 
-summary(lm(ybc ~ speed_oe, data = speed_projs_filtered))$r.squared #0.20
+summary(lm(ybc ~ speed_oe, data = speed_projs_filtered))$r.squared #0.19
 summary(lm(ybc ~ exp_speed, data = speed_projs_filtered))$r.squared #0.00
 summary(lm(ybc ~ avg_speed, data = speed_projs_filtered))$r.squared #0.16
 
@@ -86,6 +86,7 @@ team_speed %>%
        subtitle = "Rushing speed determined by a running back's speed from handoff to first contact") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+ggsave('team-speed.png', width = 15, height = 10, dpi = "retina")
 
 game_speed <- speed_projs_filtered %>%
   group_by(player, offense, defense, season, week, game_id) %>%
@@ -102,9 +103,9 @@ game_speed <- speed_projs_filtered %>%
   filter(game_rushes >= 10) %>%
   filter(next_rushes >= 10) %>%
   left_join(teams_logos_select, by = c("defense" = "team_abbr")) %>%
-  select(-team_color, defense_logo = team_logo_espn) %>%
+  dplyr::select(-team_color, defense_logo = team_logo_espn) %>%
   left_join(teams_logos_select, by = c("offense" = "team_abbr")) %>%
-  select(-team_logo_espn)
+  dplyr::select(-team_logo_espn)
 
 summary(lm(next_rushes ~ game_rushes, data = game_speed))$r.squared #0.06
 summary(lm(next_exp_speed ~ game_exp_speed, data = game_speed))$r.squared #0.15
