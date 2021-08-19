@@ -1,4 +1,3 @@
-library(rdtools)
 library(tidyverse)
 library(ggthemes)
 library(nflfastR)
@@ -68,10 +67,16 @@ gt_theme_538 <- function(data,...) {
     )}
 
 speed_projs <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/speed_projs.csv"))
-combine_data <- pull_api("/v1/player_combine_results")$player_combine_results
-pro_day_data <- pull_api("/v1/player_pro_day")$player_pro_day
+combine_data <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/combine_data.csv"))
+pro_day_data <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/pro_day_data.csv"))
 
 speed_projs <- speed_projs %>%
+  dplyr::select(-starts_with(".."))
+
+combine_data <- combine_data %>%
+  dplyr::select(-starts_with(".."))
+
+pro_day_data <- pro_day_data %>%
   dplyr::select(-starts_with(".."))
 
 speed_projs_filtered <- speed_projs %>%

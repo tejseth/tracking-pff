@@ -1,0 +1,14 @@
+name: tracking-pff
+title: tracking-pff
+username:
+account: pff-analytics
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4512629
+bundleId: 4942162
+url: https://pff-analytics.shinyapps.io/tracking-pff/
+when: 1629394667.79942
+lastSyncTime: 1629394667.79948
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: combine_data.csv|play_speed_all.csv|play-speed-year/.DS_Store|play-speed-year/play_speed_all_17.csv|play-speed-year/play_speed_all_18.csv|play-speed-year/play_speed_all_19.csv|play-speed-year/play_speed_all_20.csv|pro_day_data.csv|rb-expl-eval.R|rb-explosiveness.R|rb-speed-markdown.html|rb-speed-markdown.Rmd|rb-tracking-load.R|README.md|speed_projs.csv|play-speed-week|speed-viz
