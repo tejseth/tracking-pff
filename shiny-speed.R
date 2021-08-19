@@ -67,16 +67,16 @@ gt_theme_538 <- function(data,...) {
     )}
 
 speed_projs <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/speed_projs.csv"))
-combine_data <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/combine_data.csv"))
-pro_day_data <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/pro_day_data.csv"))
+game_speed_to_40 <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/game_speed_to_40.csv"))
+season_speed_to_40 <- read_csv(url("https://raw.githubusercontent.com/tejseth/tracking-pff/master/season_speed_to_40.csv"))
 
 speed_projs <- speed_projs %>%
   dplyr::select(-starts_with(".."))
 
-combine_data <- combine_data %>%
+game_speed_to_40 <- game_speed_to_40 %>%
   dplyr::select(-starts_with(".."))
 
-pro_day_data <- pro_day_data %>%
+season_speed_to_40 <- season_speed_to_40 %>%
   dplyr::select(-starts_with(".."))
 
 speed_projs_filtered <- speed_projs %>%
@@ -90,143 +90,6 @@ speed_projs_filtered <- speed_projs_filtered %>%
 
 rushers <- unique(speed_projs_filtered$player)
 seasons <- unique(speed_projs_filtered$season)
-
-combine_combine <- function(combine_data.frame, pro_day_data.frame) {
-  combine <- combine_data.frame %>% dplyr::select(season = year, player_id, position = projected_position,
-                                           height = height_in_inches, weight = weight_in_pounds,
-                                           arm = arm_length_in_inches, right_hand = right_hand_size_in_inches,
-                                           left_hand = left_hand_size_in_inches, wing = wingspan_in_inches,
-                                           forty = fourty_time_in_seconds, twenty = twenty_time_in_seconds,
-                                           ten = ten_time_in_seconds, bench = bench_press_in_reps,
-                                           vertical = vertical_jump_in_inches, broad = broad_jump_in_inches,
-                                           shuttle = twenty_shuttle_in_seconds, cone = three_cone_in_seconds)
-  pro_day <- pro_day_data.frame %>% dplyr::select(season = year, player_id, position_pd = projected_position,
-                                           height_pd = height_in_inches, weight_pd = weight_in_pounds,
-                                           arm_pd = arm_length_in_inches, right_hand_pd = right_hand_size_in_inches,
-                                           left_hand_pd = left_hand_size_in_inches, wing_pd = wingspan_in_inches,
-                                           forty_pd = fourty_time_in_seconds, twenty_pd = twenty_time_in_seconds,
-                                           ten_pd = ten_time_in_seconds, bench_pd = bench_press_in_reps,
-                                           vertical_pd = vertical_jump_in_inches, broad_pd = broad_jump_in_inches,
-                                           shuttle_pd = twenty_shuttle_in_seconds, cone_pd = three_cone_in_seconds)
-  all_data <- full_join(combine, pro_day, by = c("season", "player_id"))
-  height_lm <- lm(height ~ height_pd, all_data)
-  weight_lm <- lm(weight ~ weight_pd, all_data)
-  arm_lm <- lm(arm ~ arm_pd, all_data)
-  right_hand_lm <- lm(right_hand ~ right_hand_pd, all_data)
-  #left_hand_lm <- lm(left_hand ~ left_hand_pd, all_data) #Not really worth doing
-  wing_lm <- lm(wing ~ wing_pd, all_data)
-  forty_lm <- lm(forty ~ forty_pd, all_data)
-  twenty_lm <- lm(twenty ~ twenty_pd, all_data)
-  ten_lm <- lm(ten ~ ten_pd, all_data)
-  bench_lm <- lm(bench ~ bench_pd, all_data)
-  vertical_lm <- lm(vertical ~ vertical_pd, all_data)
-  broad_lm <- lm(broad ~ broad_pd, all_data)
-  shuttle_lm <- lm(shuttle ~ shuttle_pd, all_data)
-  cone_lm <- lm(cone ~ cone_pd, all_data)
-  all_data <- all_data %>%
-    mutate(height_pd = round(predict(height_lm, all_data), 3),
-           weight_pd = round(predict(weight_lm, all_data), 0),
-           arm_pd = round(predict(arm_lm, all_data), 3),
-           right_hand_pd = round(predict(right_hand_lm, all_data), 3),
-           wing_pd = round(predict(wing_lm, all_data), 3),
-           forty_pd = round(predict(forty_lm, all_data), 2),
-           twenty_pd = round(predict(twenty_lm, all_data),2),
-           ten_pd = round(predict(ten_lm, all_data), 2),
-           bench_pd = round(predict(bench_lm, all_data), 0),
-           vertical_pd = round(predict(vertical_lm, all_data), 1),
-           broad_pd = round(predict(broad_lm, all_data), 0),
-           shuttle_pd = round(predict(shuttle_lm, all_data), 2),
-           cone_pd = round(predict(cone_lm, all_data), 2))
-  all_data <- all_data %>%
-    mutate(position = ifelse(is.na(position), position_pd, position),
-           height = ifelse(is.na(height), height_pd, height), weight = ifelse(is.na(weight), weight_pd, weight),
-           arm = ifelse(is.na(arm), arm_pd, arm), right_hand = ifelse(is.na(right_hand), right_hand_pd, right_hand),
-           left_hand = ifelse(is.na(left_hand), left_hand_pd, left_hand), wing = ifelse(is.na(wing), wing_pd, wing),
-           forty = ifelse(is.na(forty), forty_pd, forty), twenty = ifelse(is.na(twenty), twenty_pd, twenty),
-           ten = ifelse(is.na(ten), ten_pd, ten), bench = ifelse(is.na(bench), bench_pd, bench),
-           vertical = ifelse(is.na(vertical), vertical_pd, vertical), broad = ifelse(is.na(broad), broad_pd, broad),
-           shuttle = ifelse(is.na(shuttle), shuttle_pd, shuttle), cone = ifelse(is.na(cone), cone_pd, cone)) %>%
-    dplyr::select(season, player_id, position, height, weight, arm, hand = right_hand, wing, forty,
-           twenty, ten, bench, vertical, broad, shuttle, cone)
-  return(all_data)
-}
-
-combine_all_results <- combine_combine(combine_data, pro_day_data)
-
-combine_select <- combine_all_results %>%
-  dplyr::select(player_id, forty, combine_season = season, twenty, ten, combine_weight = weight, position) %>%
-  mutate(speed_score = forty / combine_weight)
-
-season_speed <- speed_projs_filtered %>%
-  group_by(player, player_id, season, offense) %>%
-  summarize(rushes = n(),
-            exp_speed = mean(exp_speed),
-            avg_speed = mean(avg_speed),
-            avg_ssoe = mean(speed_oe)) %>%
-  filter(rushes >= 50)
-
-season_speed <- season_speed %>%
-  left_join(combine_select, by = c("player_id"))
-
-range01 <- function(x){(x-min(x))/(max(x)-min(x))}
-
-season_speed_to_40 <- speed_projs_filtered %>%
-  group_by(player, player_id, season, offense) %>%
-  summarize(rushes = n(),
-            exp_speed = mean(exp_speed),
-            avg_speed = mean(avg_speed),
-            avg_speed_oe = mean(speed_oe),
-            avg_ybc = mean(ybc)) %>%
-  filter(rushes >= 50) %>%
-  left_join(combine_select, by = c("player_id")) %>%
-  dplyr::select(-position, -combine_weight, -speed_score) %>%
-  ungroup()
-
-season_speed_to_40$forty[is.na(season_speed_to_40$forty)] <- mean(season_speed_to_40$forty, na.rm = T)
-season_speed_to_40$twenty[is.na(season_speed_to_40$twenty)] <- mean(season_speed_to_40$twenty, na.rm = T)
-season_speed_to_40$ten[is.na(season_speed_to_40$ten)] <- mean(season_speed_to_40$ten, na.rm = T)
-
-forty_rank <- season_speed_to_40 %>%
-  arrange(forty) %>%
-  mutate(forty_rank = row_number()) %>%
-  dplyr::select(forty_rank, adj_forty = forty)
-twenty_rank <- season_speed_to_40 %>%
-  arrange(twenty) %>%
-  mutate(twenty_rank = row_number()) %>%
-  dplyr::select(twenty_rank, adj_twenty = twenty)
-
-season_speed_to_40 <- season_speed_to_40 %>%
-  arrange(-avg_speed_oe) %>%
-  mutate(speed_perc = round(100*range01(avg_speed_oe), 1),
-         speed_rank = row_number()) %>%
-  left_join(forty_rank, by = c("speed_rank" = "forty_rank")) %>%
-  left_join(twenty_rank, by = c("speed_rank" = "twenty_rank"))
-
-lm_40 <- lm(adj_forty ~ speed_perc, data = season_speed_to_40)
-summary(lm_40)
-
-teams_logos_select <- teams_colors_logos %>%
-  dplyr::select(team_abbr, team_logo_espn, team_color)
-
-game_speed_to_40 <-  speed_projs_filtered %>%
-  group_by(player, player_id, season, week, game_id, offense, defense) %>%
-  summarize(rushes = n(),
-            exp_speed = mean(exp_speed),
-            avg_speed = mean(avg_speed),
-            avg_speed_oe = mean(speed_oe)) %>%
-  filter(rushes >= 10) %>%
-  mutate(speed_perc = round(100*(avg_speed_oe-min(game_speed_to_40$avg_speed_oe))/(max(game_speed_to_40$avg_speed_oe)-min(game_speed_to_40$avg_speed_oe)), 1)) %>%
-  left_join(teams_logos_select, by = c("defense" = "team_abbr")) %>%
-  dplyr::select(-team_color, defense_logo = team_logo_espn) %>%
-  left_join(teams_logos_select, by = c("offense" = "team_abbr")) %>%
-  dplyr::select(-team_logo_espn)
-
-games_40 <- predict(lm_40, newdata = game_speed_to_40)
-
-game_speed_to_40 <- cbind(game_speed_to_40, games_40)
-
-game_speed_to_40 <- game_speed_to_40 %>%
-  rename(game_forty = starts_with("..."))
 
 options(shiny.usecairo=T)
 
