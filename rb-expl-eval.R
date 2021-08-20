@@ -292,6 +292,7 @@ season_speed_to_40 <- speed_projs_filtered %>%
   summarize(rushes = n(),
             exp_speed = mean(exp_speed),
             avg_speed = mean(avg_speed),
+            avg_ybc = mean(ybc),
             avg_speed_oe = mean(speed_oe)) %>%
   filter(rushes >= 50) %>%
   left_join(combine_select, by = c("player_id")) %>%
@@ -329,6 +330,7 @@ game_speed_to_40 <-  speed_projs_filtered %>%
   summarize(rushes = n(),
             exp_speed = mean(exp_speed),
             avg_speed = mean(avg_speed),
+            avg_ybc = mean(ybc),
             avg_speed_oe = mean(speed_oe)) %>%
   filter(rushes >= 10) %>%
   mutate(speed_perc = round(100*(avg_speed_oe-min(game_speed_to_40$avg_speed_oe))/(max(game_speed_to_40$avg_speed_oe)-min(game_speed_to_40$avg_speed_oe)), 1)) %>%
