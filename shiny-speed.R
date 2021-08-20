@@ -1,16 +1,7 @@
 library(tidyverse)
 library(ggthemes)
 library(nflfastR)
-library(mltools)
-library(data.table)
-library(xgboost)
-library(caret)
-library(vip)
-library(SHAPforxgboost)
 library(ggimage)
-library(ggcorrplot)
-library(lme4)
-library(merTools)
 library(shiny)
 library(shinythemes)
 library(gt)
@@ -90,6 +81,9 @@ speed_projs_filtered <- speed_projs_filtered %>%
 
 rushers <- unique(speed_projs_filtered$player)
 seasons <- unique(speed_projs_filtered$season)
+
+teams_logos_select <- teams_colors_logos %>%
+  dplyr::select(team_abbr, team_logo_espn, team_color)
 
 options(shiny.usecairo=T)
 

@@ -5,10 +5,10 @@ account: pff-analytics
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 4512643
-bundleId: 4942178
+bundleId: 4942463
 url: https://pff-analytics.shinyapps.io/updating-40/
-when: 1629394976.51363
-lastSyncTime: 1629394976.51364
+when: 1629400573.43978
+lastSyncTime: 1629400573.43979
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: combine_data.csv|play_speed_all.csv|play-speed-year/.DS_Store|play-speed-year/play_speed_all_17.csv|play-speed-year/play_speed_all_18.csv|play-speed-year/play_speed_all_19.csv|play-speed-year/play_speed_all_20.csv|pro_day_data.csv|rb-expl-eval.R|rb-explosiveness.R|rb-speed-markdown.html|rb-speed-markdown.Rmd|rb-tracking-load.R|README.md|speed_projs.csv|play-speed-week|speed-viz
+ignoredFiles: combine_data.csv|game_speed_to_40.csv|play_speed_all.csv|play-speed-year/.DS_Store|play-speed-year/play_speed_all_17.csv|play-speed-year/play_speed_all_18.csv|play-speed-year/play_speed_all_19.csv|play-speed-year/play_speed_all_20.csv|pro_day_data.csv|rb-expl-eval.R|rb-explosiveness.R|rb-speed-markdown.html|rb-speed-markdown.Rmd|rb-tracking-load.R|README.md|season_speed_to_40.csv|speed_projs.csv|play-speed-week|speed-viz

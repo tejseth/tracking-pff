@@ -3,9 +3,9 @@ speed_projs <- read.csv("~/tracking-pff/speed_projs.csv")
 speed_projs_filtered <- speed_projs %>%
   filter(seconds_before_contact >= 0.5 & seconds_before_contact <= 5.7)
 
-summary(lm(ybc ~ speed_oe, data = speed_projs_filtered))$r.squared #0.19
+summary(lm(ybc ~ speed_oe, data = speed_projs_filtered))$r.squared #0.11
 summary(lm(ybc ~ exp_speed, data = speed_projs_filtered))$r.squared #0.00
-summary(lm(ybc ~ avg_speed, data = speed_projs_filtered))$r.squared #0.16
+summary(lm(ybc ~ avg_speed, data = speed_projs_filtered))$r.squared #0.15
 
 speed_season_stats <- speed_projs_filtered %>%
   group_by(player, season, offense) %>%
@@ -26,9 +26,9 @@ speed_season_stats <- speed_projs_filtered %>%
   filter(rushes >= 100) %>%
   filter(next_rushes >= 100 | is.na(next_rushes))
 
-summary(lm(avg_ybc ~ avg_ssoe, data = speed_season_stats, weights = rushes))$r.squared #0.25
+summary(lm(avg_ybc ~ avg_ssoe, data = speed_season_stats, weights = rushes))$r.squared #0.20
 summary(lm(avg_yac ~ avg_ssoe, data = speed_season_stats, weights = rushes))$r.squared #0.01
-summary(lm(next_ybc ~ avg_ybc, data = speed_season_stats))$r.squared #0.07
+summary(lm(next_ybc ~ avg_ybc, data = speed_season_stats))$r.squared #0.09
 summary(lm(next_yac ~ avg_yac, data = speed_season_stats))$r.squared #0.55
 
 rb_colors <- rushing_data %>%
@@ -44,7 +44,7 @@ speed_oe_stats <- speed_projs_filtered %>%
   summarize(rushes = n(), 
             avg_speed_oe = mean(speed_oe),
             avg_ybc = mean(ybc)) %>%
-  filter(rushes >= 250) %>%
+  filter(rushes >= 220) %>%
   arrange(-avg_speed_oe) %>%
   left_join(rb_colors, by = c("player"))
 
@@ -116,7 +116,7 @@ combine_data <- pull_api("/v1/player_combine_results")$player_combine_results
 pro_day_data <- pull_api("/v1/player_pro_day")$player_pro_day
 
 combine_combine <- function(combine_data.frame, pro_day_data.frame) {
-  combine <- combine_data.frame %>% select(season = year, player_id, position = projected_position,
+  combine <- combine_data.frame %>% dplyr::select(season = year, player_id, position = projected_position,
                                            height = height_in_inches, weight = weight_in_pounds,
                                            arm = arm_length_in_inches, right_hand = right_hand_size_in_inches,
                                            left_hand = left_hand_size_in_inches, wing = wingspan_in_inches,
@@ -124,7 +124,7 @@ combine_combine <- function(combine_data.frame, pro_day_data.frame) {
                                            ten = ten_time_in_seconds, bench = bench_press_in_reps,
                                            vertical = vertical_jump_in_inches, broad = broad_jump_in_inches,
                                            shuttle = twenty_shuttle_in_seconds, cone = three_cone_in_seconds)
-  pro_day <- pro_day_data.frame %>% select(season = year, player_id, position_pd = projected_position,
+  pro_day <- pro_day_data.frame %>% dplyr::select(season = year, player_id, position_pd = projected_position,
                                            height_pd = height_in_inches, weight_pd = weight_in_pounds,
                                            arm_pd = arm_length_in_inches, right_hand_pd = right_hand_size_in_inches,
                                            left_hand_pd = left_hand_size_in_inches, wing_pd = wingspan_in_inches,
@@ -170,7 +170,7 @@ combine_combine <- function(combine_data.frame, pro_day_data.frame) {
            ten = ifelse(is.na(ten), ten_pd, ten), bench = ifelse(is.na(bench), bench_pd, bench),
            vertical = ifelse(is.na(vertical), vertical_pd, vertical), broad = ifelse(is.na(broad), broad_pd, broad),
            shuttle = ifelse(is.na(shuttle), shuttle_pd, shuttle), cone = ifelse(is.na(cone), cone_pd, cone)) %>%
-    select(season, player_id, position, height, weight, arm, hand = right_hand, wing, forty,
+    dplyr::select(season, player_id, position, height, weight, arm, hand = right_hand, wing, forty,
            twenty, ten, bench, vertical, broad, shuttle, cone)
   return(all_data)
 }
@@ -333,9 +333,9 @@ game_speed_to_40 <-  speed_projs_filtered %>%
   filter(rushes >= 10) %>%
   mutate(speed_perc = round(100*(avg_speed_oe-min(game_speed_to_40$avg_speed_oe))/(max(game_speed_to_40$avg_speed_oe)-min(game_speed_to_40$avg_speed_oe)), 1)) %>%
   left_join(teams_logos_select, by = c("defense" = "team_abbr")) %>%
-  select(-team_color, defense_logo = team_logo_espn) %>%
+  dplyr::select(-team_color, defense_logo = team_logo_espn) %>%
   left_join(teams_logos_select, by = c("offense" = "team_abbr")) %>%
-  select(-team_logo_espn)
+  dplyr::select(-team_logo_espn)
 
 games_40 <- predict(lm_40, newdata = game_speed_to_40)
 
@@ -344,6 +344,8 @@ game_speed_to_40 <- cbind(game_speed_to_40, games_40)
 game_speed_to_40 <- game_speed_to_40 %>%
   rename(game_forty = starts_with("..."))
 
+write.csv(season_speed_to_40, "season_speed_to_40.csv")
+write.csv(game_speed_to_40, "game_speed_to_40.csv")
 
 ############################################################################
 
@@ -393,5 +395,29 @@ ggplot() +
        subtitle = "Black dots listed for every other rusher with at least 50 rushes")
 
 
+ryoe_stats <- nfl_ryoe_projs %>%
+  filter(season >= 2018) %>%
+  group_by(player) %>%
+  summarize(avg_ryoe = mean(ryoe))
+
+speed_oe_stats <- speed_oe_stats %>%
+  left_join(ryoe_stats, by = c("player"))
+
+speed_oe_stats %>%
+  ggplot(aes(x = avg_speed_oe, y = avg_ryoe)) +
+  geom_smooth(se = FALSE, method = "lm", size = 1.7, color = "black") +
+  geom_hline(yintercept = mean(speed_oe_stats$avg_ryoe), linetype = "dashed", alpha = 0.5) +
+  geom_vline(xintercept = mean(speed_oe_stats$avg_speed_oe), linetype = "dashed", alpha = 0.5) +
+  geom_point(aes(fill = team_color, color = team_color2, size = rushes), shape = 21, alpha = 0.9) +
+  ggrepel::geom_text_repel(aes(label = player), size = 5) +
+  theme_reach() +
+  scale_color_identity(aesthetics = c("fill", "color")) +
+  labs(x = 'Average Speed Over Expected',
+       y = "Average RYOE",
+       title = "How Speed Over Expected Correlates with Rushing Yards Over Expected",
+       subtitle = "2018-2020, minimum of 250 rushes") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6))
+  
 
 

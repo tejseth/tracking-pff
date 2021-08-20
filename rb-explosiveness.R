@@ -1,6 +1,7 @@
 play_speed_all_18 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_18.csv")
 play_speed_all_19 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_19.csv")
 play_speed_all_20 <- read.csv("~/tracking-pff/play-speed-year/play_speed_all_20.csv")
+run_blocking <- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/run_blocking.csv.gz"), season_start = 2018, season_end = 2020)
 
 play_speed_all <- rbind(play_speed_all_18, play_speed_all_19, play_speed_all_20)
 
@@ -11,11 +12,6 @@ play_speed_all <- play_speed_all %>%
 
 speed_projs <- read.csv("~/tracking-pff/speed_projs.csv")
 stadiums <- pull_s3("flat_files/NFL_Stadiums.csv", bucket = "ml")
-
-stadiums_select <- stadiums %>%
-  dplyr::select(franchise_id, season, dome, turf) %>%
-  mutate(dome = as.factor(dome),
-         turf = as.factor(turf))
 
 summary(lm(ybc ~ avg_speed, data = play_speed_all))$r.squared #0.15
 summary(lm(ybc ~ seconds_before_contact, data = play_speed_all))$r.squared #0.31
@@ -139,141 +135,6 @@ rushing_data_speed %>%
        subtitle = "2018-2020, weeks 1-17",
        fill = "Turf Indicator") +
   theme(legend.position = "bottom")
-
-rushing_data_speed <- rushing_data_speed %>%
-  mutate(seconds_left_in_half = case_when(
-    quarter == 1 ~ as.integer(seconds_left_in_quarter + 900),
-    quarter == 2 ~ as.integer(seconds_left_in_quarter),
-    quarter == 3 ~ as.integer(seconds_left_in_quarter + 900),
-    quarter == 4 ~ as.integer(seconds_left_in_quarter),
-    TRUE ~ as.integer(0)
-  )) %>%
-  dplyr::select(-seconds_left_in_quarter)
-
-colSums(is.na(rushing_data_speed))
-
-rushing_data_speed %>% group_by(concept_1) %>% tally(sort = T)
-
-others <- c("FB Run", "Undefined", "Trick")
-
-rushing_data_speed <- rushing_data_speed %>%
-  mutate(concept_1 = ifelse(concept_1 %in% others, "Other", concept_1))
-
-speed_data_select <- rushing_data_speed %>%
-  dplyr::select(down, distance, seconds_left_in_half, box_players, 
-                concept_1, yards_to_go, avg_speed, turf, dome) %>%
-  mutate(label = avg_speed) %>%
-  dplyr::select(-avg_speed) %>%
-  mutate(concept_1 = as.factor(concept_1)) %>%
-  mutate(down = as.factor(down)) %>%
-  dplyr::select(label, everything())
-
-speed_lmer <- lmer(avg_speed ~ down + distance + seconds_left_in_half + 
-                        box_players + yards_to_go + turf + dome +
-                        (1|player) + (1|home_franchise_id), data = rushing_data_speed)
-summary(speed_lmer)
-
-VarCorr(speed_lmer) %>% 
-  as_tibble() %>% 
-  mutate(icc = vcov / sum(vcov)) %>% 
-  dplyr::select(grp, icc)
-
-speed_effects <- REsim(speed_lmer)
-
-trsf <- one_hot(as.data.table(speed_data_select))
-
-colSums(is.na(trsf))
-
-smp_size <- floor(0.50 * nrow(trsf))
-set.seed(2011) #go lions
-ind <- sample(seq_len(nrow(trsf)), size = smp_size)
-train <- as.matrix(trsf[ind, ])
-test <- as.matrix(trsf[-ind, ])
-
-dim(train)
-
-speed_mod <-
-  xgboost(
-    data = train[, 2:23],
-    label = train[, 1],
-    nrounds = 1000,
-    objective = "reg:squarederror",
-    early_stopping_rounds = 3,
-    max_depth = 6,
-    eta = .25
-  )   
-
-pred_xgb <- predict(speed_mod, test[, 2:23])
-
-yhat <- pred_xgb
-y <- test[, 1]
-postResample(yhat, y) #RMSE = 1.16
-
-hyper_grid <- expand.grid(max_depth = seq(1, 6, 1),
-                          eta = seq(.15, .3, .01))
-
-xgb_train_rmse <- NULL
-xgb_test_rmse <- NULL
-
-for (j in 1:nrow(hyper_grid)) {
-  set.seed(123)
-  m_xgb_untuned <- xgb.cv(
-    data = train[, 2:23],
-    label = train[, 1],
-    nrounds = 1000,
-    objective = "reg:squarederror",
-    early_stopping_rounds = 3,
-    nfold = 5,
-    max_depth = hyper_grid$max_depth[j],
-    eta = hyper_grid$eta[j]
-  )
-  
-  xgb_train_rmse[j] <- m_xgb_untuned$evaluation_log$train_rmse_mean[m_xgb_untuned$best_iteration]
-  xgb_test_rmse[j] <- m_xgb_untuned$evaluation_log$test_rmse_mean[m_xgb_untuned$best_iteration]
-  
-  cat(j, "\n")
-}
-
-#ideal hyperparamters
-hyper_grid[which.min(xgb_test_rmse), ]
-
-speed_model <-
-  xgboost(
-    data = train[, 2:23],
-    label = train[, 1],
-    nrounds = 1000,
-    objective = "reg:squarederror",
-    early_stopping_rounds = 3,
-    max_depth = 2, #ideal max depth
-    eta = 0.28 #ideal eta
-  )   
-
-vip(speed_model, num_features = 22) +
-  theme_reach()
-
-shap_values <- shap.values(xgb_model = speed_model, X_train = train[, 2:23])
-shape_values_mean <- as.data.frame(shap_values$mean_shap_score)
-shap_long <- shap.prep(xgb_model = speed_model, X_train = train[, 2:23])
-shap_long <- shap.prep(shap_contrib = shap_values$shap_score, X_train = train[, 2:23])
-shap.plot.summary(shap_long)
-
-pred_xgb <- predict(speed_model, test[, 2:23])
-
-yhat <- pred_xgb
-y <- test[, 1]
-postResample(yhat, y) #RMSE = 1.03
-
-speed_preds <- as.data.frame(
-  matrix(predict(speed_model, as.matrix(trsf %>% dplyr::select(-label))))
-) %>%
-  dplyr::rename(exp_speed = V1)
-
-speed_projs <- cbind(rushing_data_speed, speed_preds)
-
-speed_projs <- speed_projs %>%
-  mutate(speed_oe = avg_speed - exp_speed)
-
-write.csv(speed_projs, "speed_projs.csv")
 
 
 
