@@ -109,6 +109,126 @@ play_speed_20_2 <- tracking_2_d %>%
             max_speed = max(speed))
 write.csv(play_speed_20_2, "play_speed_20_2.csv")
 
+tracking_3 <- tracking_pass_2020_3 %>%
+  filter(run_pass == "P")
+pass_arrival_3 <- tracking_3 %>%
+  filter(play_event == "pass_forward") %>%
+  distinct(gameid, playid, time_since_snap) %>%
+  rename(pass_forward_time = time_since_snap)
+tracking_3 <- tracking_3 %>%
+  left_join(pass_arrival_3, by = c("gameid", "playid"))
+player_start_x_3 <- tracking_3 %>%
+  filter(play_event == "ball_snap" | time_since_snap == 0) %>%
+  dplyr::select(gameid, playid, player_name, start_x = x) %>%
+  distinct(gameid, playid, player_name, start_x)
+player_end_x_3 <- tracking_3 %>%
+  filter(play_event == "pass_forward") %>%
+  dplyr::select(gameid, playid, player_name, end_x = x) %>%
+  distinct(gameid, playid, player_name, end_x)
+player_start_y_3 <- tracking_3 %>%
+  filter(play_event == "ball_snap") %>%
+  dplyr::select(gameid, playid, player_name, start_y = y) %>%
+  distinct(gameid, playid, player_name, start_y)
+player_end_y_3 <- tracking_3 %>%
+  filter(play_event == "pass_forward") %>%
+  dplyr::select(gameid, playid, player_name, end_y = y) %>%
+  distinct(gameid, playid, player_name, end_y)
+tracking_3 <- tracking_3 %>%
+  left_join(player_start_x_3, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_end_x_3, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_start_y_3, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_end_y_3, by = c("gameid", "playid", "player_name"))
+tracking_3_d <- tracking_3 %>%
+  filter(off_def == "D") %>%
+  mutate(abs_change_x = abs(end_x - start_x),
+         change_y = end_y - end_x) %>%
+  filter(abs_change_x <= 5, change_y >= 10)
+play_speed_20_3 <- tracking_3_d %>%
+  group_by(player_name, gameid, playid) %>%
+  summarize(avg_speed = mean(speed),
+            max_speed = max(speed))
+write.csv(play_speed_20_3, "play_speed_20_3.csv")
+
+tracking_4 <- tracking_pass_2020_4 %>%
+  filter(run_pass == "P")
+pass_arrival_4 <- tracking_4 %>%
+  filter(play_event == "pass_forward") %>%
+  distinct(gameid, playid, time_since_snap) %>%
+  rename(pass_forward_time = time_since_snap)
+tracking_4 <- tracking_4 %>%
+  left_join(pass_arrival_4, by = c("gameid", "playid"))
+player_start_x_4 <- tracking_4 %>%
+  filter(play_event == "ball_snap" | time_since_snap == 0) %>%
+  dplyr::select(gameid, playid, player_name, start_x = x) %>%
+  distinct(gameid, playid, player_name, start_x)
+player_end_x_4 <- tracking_4 %>%
+  filter(play_event == "pass_forward") %>%
+  dplyr::select(gameid, playid, player_name, end_x = x) %>%
+  distinct(gameid, playid, player_name, end_x)
+player_start_y_4 <- tracking_4 %>%
+  filter(play_event == "ball_snap") %>%
+  dplyr::select(gameid, playid, player_name, start_y = y) %>%
+  distinct(gameid, playid, player_name, start_y)
+player_end_y_4 <- tracking_4 %>%
+  filter(play_event == "pass_forward") %>%
+  dplyr::select(gameid, playid, player_name, end_y = y) %>%
+  distinct(gameid, playid, player_name, end_y)
+tracking_4 <- tracking_4 %>%
+  left_join(player_start_x_4, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_end_x_4, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_start_y_4, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_end_y_4, by = c("gameid", "playid", "player_name"))
+tracking_4_d <- tracking_4 %>%
+  filter(off_def == "D") %>%
+  mutate(abs_change_x = abs(end_x - start_x),
+         change_y = end_y - end_x) %>%
+  filter(abs_change_x <= 5, change_y >= 10)
+play_speed_20_4 <- tracking_4_d %>%
+  group_by(player_name, gameid, playid) %>%
+  summarize(avg_speed = mean(speed),
+            max_speed = max(speed))
+write.csv(play_speed_20_4, "play_speed_20_4.csv")
+
+tracking_4 <- tracking_pass_2020_4 %>%
+  filter(run_pass == "P")
+pass_arrival_4 <- tracking_4 %>%
+  filter(play_event == "pass_forward") %>%
+  distinct(gameid, playid, time_since_snap) %>%
+  rename(pass_forward_time = time_since_snap)
+tracking_4 <- tracking_4 %>%
+  left_join(pass_arrival_4, by = c("gameid", "playid"))
+player_start_x_4 <- tracking_4 %>%
+  filter(play_event == "ball_snap" | time_since_snap == 0) %>%
+  dplyr::select(gameid, playid, player_name, start_x = x) %>%
+  distinct(gameid, playid, player_name, start_x)
+player_end_x_4 <- tracking_4 %>%
+  filter(play_event == "pass_forward") %>%
+  dplyr::select(gameid, playid, player_name, end_x = x) %>%
+  distinct(gameid, playid, player_name, end_x)
+player_start_y_4 <- tracking_4 %>%
+  filter(play_event == "ball_snap") %>%
+  dplyr::select(gameid, playid, player_name, start_y = y) %>%
+  distinct(gameid, playid, player_name, start_y)
+player_end_y_4 <- tracking_4 %>%
+  filter(play_event == "pass_forward") %>%
+  dplyr::select(gameid, playid, player_name, end_y = y) %>%
+  distinct(gameid, playid, player_name, end_y)
+tracking_4 <- tracking_4 %>%
+  left_join(player_start_x_4, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_end_x_4, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_start_y_4, by = c("gameid", "playid", "player_name")) %>%
+  left_join(player_end_y_4, by = c("gameid", "playid", "player_name"))
+tracking_4_d <- tracking_4 %>%
+  filter(off_def == "D") %>%
+  mutate(abs_change_x = abs(end_x - start_x),
+         change_y = end_y - end_x) %>%
+  filter(abs_change_x <= 5, change_y >= 10)
+play_speed_20_4 <- tracking_4_d %>%
+  group_by(player_name, gameid, playid) %>%
+  summarize(avg_speed = mean(speed),
+            max_speed = max(speed))
+write.csv(play_speed_20_4, "play_speed_20_4.csv")
+
 tracking_pass_2019_1 <- pull_ngs(season_start = 2019, season_end = 2019, wk_start = 1, wk_end = 1, run_pass_all = "p")
 tracking_pass_2019_2 <- pull_ngs(season_start = 2019, season_end = 2019, wk_start = 2, wk_end = 2, run_pass_all = "p")
 tracking_pass_2019_3 <- pull_ngs(season_start = 2019, season_end = 2019, wk_start = 3, wk_end = 3, run_pass_all = "p")
