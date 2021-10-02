@@ -1,5 +1,6 @@
 library(rdtools)
 library(tidyverse)
+library(data.table)
 
 tracking_pass_2020_1 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 1, wk_end = 1, run_pass_all = "p")
 tracking_pass_2020_2 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 2, wk_end = 2, run_pass_all = "p")
@@ -143,7 +144,7 @@ tracking_pass_2019_16 <- pull_ngs(season_start = 2019, season_end = 2019, wk_sta
 tracking_pass_2019_17 <- pull_ngs(season_start = 2019, season_end = 2019, wk_start = 17, wk_end = 17, run_pass_all = "p")
 
 play_speed_19_1 <- db_speed_func(tracking_pass_2019_1)
-write.csv(play_speed_20_1, "play_speed_20_1.csv")
+write.csv(play_speed_19_1, "play_speed_19_1.csv")
 
 play_speed_19_2 <- db_speed_func(tracking_pass_2019_2)
 write.csv(play_speed_19_2, "play_speed_19_2.csv")
@@ -261,4 +262,32 @@ write.csv(play_speed_18_16, "play_speed_18_16.csv")
 
 play_speed_18_17 <- db_speed_func(tracking_pass_2018_17)
 write.csv(play_speed_18_17, "play_speed_18_17.csv")
+
+##########################################################################
+
+ID <- c(seq(1, 17))
+
+df_play_speed_all_20 <- list()
+
+for(i in 1:length(ID)){
+  
+  play_speed_temp_20 <- read_csv(paste0("~/tracking-pff/cb-speed-20/play_speed_20_",ID[i],".csv"),
+                                 col_types = cols())
+  
+  df_play_speed_all_20[[i]] <- play_speed_temp_20
+  
+}
+
+cb_speed_all_20 <- rbindlist(df_play_speed_all_20)
+write.csv(cb_speed_all_20, "cb_speed_all_20.csv")
+
+cb_speed_all_20 %>% 
+  group_by(player_name) %>% 
+  summarize(count = n(), avg_speed = mean(avg_speed)) %>% 
+  filter(count >= 5) %>%
+  arrange(-avg_speed) 
+
+
+
+
 
