@@ -213,7 +213,7 @@ tracking_pass_2018_16 <- pull_ngs(season_start = 2018, season_end = 2018, wk_sta
 tracking_pass_2018_17 <- pull_ngs(season_start = 2018, season_end = 2018, wk_start = 17, wk_end = 17, run_pass_all = "p")
 
 play_speed_18_1 <- db_speed_func(tracking_pass_2018_1)
-write.csv(play_speed_20_1, "play_speed_20_1.csv")
+write.csv(play_speed_18_1, "play_speed_18_1.csv")
 
 play_speed_18_2 <- db_speed_func(tracking_pass_2018_2)
 write.csv(play_speed_18_2, "play_speed_18_2.csv")
