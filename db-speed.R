@@ -1,6 +1,19 @@
 library(rdtools)
 library(tidyverse)
+library(ggthemes)
+library(nflfastR)
+library(mltools)
 library(data.table)
+library(xgboost)
+library(caret)
+library(vip)
+library(SHAPforxgboost)
+library(ggimage)
+library(ggcorrplot)
+library(lme4)
+library(merTools)
+
+passing_data <<- pull_s3(paste0("analytics/projections/by_facet/", 'nfl', "/%i/passing.csv.gz"), season_start = 2018, season_end = 2021)
 
 tracking_pass_2020_1 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 1, wk_end = 1, run_pass_all = "p")
 tracking_pass_2020_2 <- pull_ngs(season_start = 2020, season_end = 2020, wk_start = 2, wk_end = 2, run_pass_all = "p")
@@ -281,17 +294,181 @@ for(i in 1:length(ID)){
 cb_speed_all_20 <- rbindlist(df_play_speed_all_20)
 write.csv(cb_speed_all_20, "cb_speed_all_20.csv")
 
-cb_speed_all_20 %>% 
-  group_by(player_name) %>% 
-  summarize(count = n(), avg_speed = mean(avg_speed)) %>% 
-  filter(count >= 5) %>%
-  arrange(-avg_speed) 
+df_play_speed_all_19 <- list()
 
+for(i in 1:length(ID)){
+  
+  play_speed_temp_19 <- read_csv(paste0("~/tracking-pff/cb-speed-19/play_speed_19_",ID[i],".csv"),
+                                 col_types = cols())
+  
+  df_play_speed_all_19[[i]] <- play_speed_temp_19
+  
+}
 
+df_play_speed_all_18 <- list()
 
+for(i in 1:length(ID)){
+  
+  play_speed_temp_18 <- read_csv(paste0("~/tracking-pff/cb-speed-18/play_speed_18_",ID[i],".csv"),
+                                 col_types = cols())
+  
+  df_play_speed_all_18[[i]] <- play_speed_temp_18
+  
+}
 
+cb_speed_all_18 <- rbindlist(df_play_speed_all_18)
+write.csv(cb_speed_all_18, "cb_speed_all_18.csv")
 
+############################################################################
 
+cb_speed_all_18 <- read.csv("~/tracking-pff/cb_speed_all_18.csv")
+cb_speed_all_19 <- read.csv("~/tracking-pff/cb_speed_all_19.csv")
+cb_speed_all_20 <- read.csv("~/tracking-pff/cb_speed_all_20.csv")
 
+cb_speed_all <- rbind(cb_speed_all_18, cb_speed_all_19, cb_speed_all_20)
+
+cb_speed_all <- cb_speed_all %>%
+  dplyr::select(player_name:max_speed)
+
+passing_data_select <- passing_data %>%
+  filter(quarter %in% c(1, 2, 3, 4)) %>%
+  filter(week %in% seq(1, 17, 1)) %>%
+  mutate(half_seconds_remaining = case_when(
+    quarter == 1 ~ as.integer(seconds_left_in_quarter) + as.integer(900),
+    quarter == 2 ~ as.integer(seconds_left_in_quarter),
+    quarter == 3 ~ as.integer(seconds_left_in_quarter) + as.integer(900),
+    quarter == 4 ~ as.integer(seconds_left_in_quarter) 
+  ),
+  num_dl = as.integer(substring(defense_personnel, 1, 1)),
+  num_lb = as.integer(substring(defense_personnel, 3, 3)),
+  num_db = as.integer(substring(defense_personnel, 5, 5))) %>%
+  dplyr::select(game_id, play_id, season, half_seconds_remaining, distance, down, yards_to_go,
+                shotgun, time_to_throw, play_action, box_player_count, screen, 
+                pass_rusher_count, num_dl, num_lb, num_db)
+
+cb_speed_all <- cb_speed_all %>%
+  left_join(passing_data_select, by = c("gameid" = "game_id", "playid" = "play_id")) %>%
+  filter(!is.na(yards_to_go)) %>%
+  filter(!is.na(num_lb)) %>%
+  filter(!num_db %in% c("X", "e")) %>%
+  filter(num_dl != "X") %>%
+  filter(!num_lb %in% c(" ", "X"))
+  
+
+colSums(is.na(cb_speed_all))
+
+cb_speed_all$down <- as.factor(cb_speed_all$down)
+cb_speed_all$season <- as.factor(cb_speed_all$season)
+
+cb_speed_select <- cb_speed_all %>%
+  dplyr::select(avg_speed:num_db, -max_speed)
+
+trsf <- one_hot(as.data.table(cb_speed_select))
+
+colSums(is.na(trsf))
+
+smp_size <- floor(0.50 * nrow(trsf))
+set.seed(2014) #go lions
+ind <- sample(seq_len(nrow(trsf)), size = smp_size)
+train <- as.matrix(trsf[ind, ])
+test <- as.matrix(trsf[-ind, ])
+
+dim(train)
+
+cb_speed_mod <-
+  xgboost(
+    data = train[, 2:20],
+    label = train[, 1],
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 6,
+    eta = .25
+  )   
+
+vip(cb_speed_mod) + ggthemes::theme_fivethirtyeight()
+
+pred_xgb <- predict(cb_speed_mod, test[, 2:20])
+yhat <- pred_xgb
+y <- test[, 1]
+postResample(yhat, y) #RMSE = 1.03
+
+hyper_grid <- expand.grid(max_depth = seq(1, 6, 1),
+                          eta = seq(.15, .3, .01))
+
+xgb_train_rmse <- NULL
+xgb_test_rmse <- NULL
+
+for (j in 1:nrow(hyper_grid)) {
+  set.seed(123)
+  m_xgb_untuned <- xgb.cv(
+    data = train[, 2:20],
+    label = train[, 1],
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    nfold = 5,
+    max_depth = hyper_grid$max_depth[j],
+    eta = hyper_grid$eta[j]
+  )
+  
+  xgb_train_rmse[j] <- m_xgb_untuned$evaluation_log$train_rmse_mean[m_xgb_untuned$best_iteration]
+  xgb_test_rmse[j] <- m_xgb_untuned$evaluation_log$test_rmse_mean[m_xgb_untuned$best_iteration]
+  
+  cat(j, "\n")
+}
+
+#ideal hyperparamters
+hyper_grid[which.min(xgb_test_rmse), ]
+
+cb_speed_model <-
+  xgboost(
+    data = train[, 2:20],
+    label = train[, 1],
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 3, #ideal max depth
+    eta = 0.26 #ideal eta
+  )   
+
+vip(cb_speed_model, num_features = 19) + theme_fivethirtyeight()
+
+shap_values <- shap.values(xgb_model = cb_speed_model, X_train = train[, 2:20])
+shape_values_mean <- as.data.frame(shap_values$mean_shap_score)
+shap_long <- shap.prep(xgb_model = cb_speed_model, X_train = train[, 2:20])
+shap_long <- shap.prep(shap_contrib = shap_values$shap_score, X_train = train[, 2:20])
+shap.plot.summary(shap_long)
+
+pred_xgb <- predict(cb_speed_model, test[, 2:20])
+yhat <- pred_xgb
+y <- test[, 1]
+postResample(yhat, y) #RMSE = 1.05
+
+cb_speed_preds <- as.data.frame(
+  matrix(predict(cb_speed_model, as.matrix(trsf %>% dplyr::select(-avg_speed))))
+) %>%
+  dplyr::rename(exp_speed = V1)
+
+cb_speed_projs <- cbind(cb_speed_all, cb_speed_preds)
+
+cb_speed_projs <- cb_speed_projs %>%
+  mutate(speed_oe = avg_speed - exp_speed)
+
+cb_speed_stats <- cb_speed_projs %>%
+  group_by(player_name) %>%
+  summarize(plays = n(),
+            avg_speed = mean(avg_speed),
+            exp_speed = mean(exp_speed),
+            speed_oe = mean(speed_oe)) %>%
+  filter(plays >= 15)
+
+cb_speed_season_stats <- cb_speed_projs %>%
+  group_by(player_name, season) %>%
+  summarize(plays = n(),
+            avg_speed = mean(avg_speed),
+            exp_speed = mean(exp_speed),
+            speed_oe = mean(speed_oe)) %>%
+  filter(plays >= 10)
 
 
